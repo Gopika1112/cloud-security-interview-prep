@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+body { background: #f7f9fc; color: #0f1e3d; font-family: Inter, system-ui, -apple-system, sans-serif; }
+.dark body { background: #0b1220; color: #e2e8f0; }
+
+.dot-bg { background-image: radial-gradient(#dbe3ef 1.1px, transparent 1.1px); background-size: 18px 18px; }
+.dark .dot-bg { background-image: none; }
+.dark .sim-label { fill: #f1f5f9; }
+.dark .sim-sub { fill: #a3b3cc; }
+
+.flow-node { transition: opacity .45s ease, transform .45s ease, box-shadow .45s ease, border-color .45s ease; }
+.flow-node.dim { opacity: .38; filter: grayscale(.5); }
+.flow-node.lit { opacity: 1; }
+.flow-node.now { transform: translateY(-3px); box-shadow: 0 8px 20px -8px rgba(37,99,235,.45); }
+
+.packet-line { stroke-dasharray: 5 4; animation: dashmove 1s linear infinite; }
+@keyframes dashmove { to { stroke-dashoffset: -18; } }
+
+@keyframes pkt-fly { 0% { offset-distance: 0%; opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+.packet-pill { animation: pkt-fly 1.8s ease-in-out infinite; }
+
+@keyframes ret-dash { to { stroke-dashoffset: -14; } }
+.return-path { stroke-dasharray: 6 5; animation: ret-dash 1.1s linear infinite; }
+
+.pulse-dot { animation: pulse 1.5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.8); opacity: .5; } }
+
+@keyframes pop-in { 0% { transform: scale(.85) translateY(4px); } 60% { transform: scale(1.04) translateY(-2px); } 100% { transform: scale(1) translateY(-3px); } }
+.pop { animation: pop-in .5s ease both; }
+
+@keyframes shake-x { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.shake { animation: shake-x .4s ease 2; }
+
+input[type="range"].sim { -webkit-appearance: none; height: 6px; border-radius: 999px; background: linear-gradient(to right, #2563eb var(--fill,50%), #e6ebf3 var(--fill,50%)); outline: none; }
+input[type="range"].sim::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid #2563eb; box-shadow: 0 1px 4px rgba(15,30,61,.25); cursor: pointer; }
+
+.thin-scroll::-webkit-scrollbar { width: 6px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #d5dde9; border-radius: 999px; }
