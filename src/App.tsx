@@ -53,7 +53,7 @@ function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose, onSheet 
   return (
     <>
       {open && <div className="fixed inset-0 bg-slate-900/30 z-20 lg:hidden" onClick={onClose} />}
-      <aside className={`${open ? 'fixed inset-y-0 left-0 z-30 w-[320px] bg-white dark:bg-slate-900 shadow-xl' : 'hidden'} lg:block lg:static lg:w-[330px] shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900`}>
+      <aside className={`${open ? 'fixed inset-y-0 left-0 z-30 w-[320px] bg-white dark:bg-slate-900 shadow-xl overflow-y-auto thin-scroll' : 'hidden'} lg:block lg:sticky lg:top-[60px] lg:h-[calc(100vh-60px)] lg:max-h-[calc(100vh-60px)] self-start lg:overflow-y-auto thin-scroll lg:w-[330px] shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900`}>
         <div className="p-5">
           <div className="text-[19px] font-extrabold text-slate-900 dark:text-white">Cloud Security <span className="text-slate-400 font-normal text-[15px]">• {TOTAL} Questions</span></div>
           <div className="h-[7px] bg-slate-100 dark:bg-slate-700 rounded-full mt-3 overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: pct + '%' }} /></div>
@@ -341,6 +341,8 @@ export default function App() {
   const [sheet, setSheet] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('cs-theme') || 'light');
   const timer = useRef<any>(null);
+  const qbarRef = useRef<HTMLDivElement>(null);
+  const [railTop, setRailTop] = useState(200);
 
   const all = data ?? [];
   const term = (hq || sq).toLowerCase();
@@ -361,6 +363,15 @@ export default function App() {
     return () => clearTimeout(timer.current);
   }, [step, playing, speed, cur, active, tab]);
   useEffect(() => { localStorage.setItem('cs-done', JSON.stringify([...done])); }, [done]);
+  useEffect(() => {
+    const measure = () => {
+      const h = qbarRef.current?.offsetHeight ?? 140;
+      setRailTop(60 + h + 16);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [active]);
   useEffect(() => {
     setSeen((prev) => {
       const k = `${active}-${tab}`;
@@ -393,11 +404,13 @@ export default function App() {
         <Sidebar list={list} active={active} done={done} sq={sq} onSq={setSq} open={drawer} onSheet={() => setSheet(true)}
           onClose={() => setDrawer(false)} onPick={(id: number) => { setActive(id); setDrawer(false); }} />
         <main className="flex-1 min-w-0 px-4 sm:px-8 py-6">
+          <div ref={qbarRef} className="sticky top-[60px] z-10 bg-[#f7f9fc] dark:bg-slate-950 pt-1 pb-3 -mx-1 px-1">
           <h1 className="text-[26px] sm:text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">{cur.question}</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-[15px]">Watch the request travel. Understand every step.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-[15px]">{cur.shortDescription}</p>
+          </div>
 
           <div className="flex gap-3 items-start mt-4">
-            <div className="flex flex-col shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] lg:sticky lg:top-[76px] divide-y divide-slate-100 dark:divide-slate-800">
+            <div style={{ top: railTop }} className="flex flex-col shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] sticky self-start z-10 divide-y divide-slate-100 dark:divide-slate-800">
               {([
                 { key: 'visual' as const, step: 'STEP 1', name: 'See it', Icon: Icons.Eye, hint: 'Watch the animation' },
                 { key: 'answer' as const, step: 'STEP 2', name: 'Say it', Icon: Icons.Mic, hint: 'Speak the 60s script' },
