@@ -38,3 +38,10 @@ input[type="range"].sim::-webkit-slider-thumb { -webkit-appearance: none; width:
 
 .thin-scroll::-webkit-scrollbar { width: 6px; }
 .thin-scroll::-webkit-scrollbar-thumb { background: #d5dde9; border-radius: 999px; }
+
+@media print {
+  body * { visibility: hidden; }
+  #interview-sheet, #interview-sheet * { visibility: visible; }
+  #interview-sheet { position: absolute; inset: 0; max-height: none; overflow: visible; }
+  .no-print { display: none !important; }
+}

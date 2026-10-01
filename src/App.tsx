@@ -46,7 +46,7 @@ function Header({ q, onSearch, onMenu, theme, onTheme }: { q: string; onSearch: 
 }
 
 /* ---------- Sidebar ---------- */
-function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose }: any) {
+function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose, onSheet }: any) {
   const pct = Math.round((done.size / TOTAL) * 100);
   return (
     <>
@@ -77,6 +77,9 @@ function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose }: any) {
             })}
             {list.length === 0 && <div className="text-sm text-slate-500 p-4">No matches.</div>}
           </div>
+          <button onClick={onSheet} className="mt-3 w-full border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl px-3 py-2.5 text-[13px] font-bold flex items-center justify-center gap-2">
+            <Icons.Printer size={16} /> Interview sheet — all 20
+          </button>
         </div>
       </aside>
     </>
@@ -169,6 +172,53 @@ function SimCanvas({ q, step, playing }: { q: CloudQuestion; step: number; playi
   );
 }
 
+/* ---------- Interview sheet (printable) ---------- */
+function InterviewSheet({ all, onClose }: { all: CloudQuestion[]; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const text = all.map((q, i) =>
+    `Q${i + 1}. ${q.question}\nTakeaway: ${q.takeaway}\nKey points:\n- ${q.keyPoints.join('\n- ')}`
+  ).join('\n\n');
+  const copyAll = async () => {
+    try { await navigator.clipboard.writeText(text); }
+    catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/50 grid place-items-center p-4 no-print" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700 no-print">
+          <div className="font-extrabold text-[16px] dark:text-white">Interview sheet — all {all.length} takeaways</div>
+          <div className="ml-auto flex gap-2">
+            <button onClick={copyAll} className="border border-blue-200 text-blue-600 rounded-lg px-3 py-1.5 text-[13px] font-bold flex items-center gap-1.5">
+              {copied ? <><Icons.Check size={15} /> Copied!</> : <><Icons.Copy size={15} /> Copy all</>}
+            </button>
+            <button onClick={() => window.print()} className="bg-blue-600 text-white rounded-lg px-3 py-1.5 text-[13px] font-bold flex items-center gap-1.5"><Icons.Printer size={15} /> Print</button>
+            <button onClick={onClose} className="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-[13px] font-bold text-slate-500 dark:text-slate-300"><Icons.X size={15} /></button>
+          </div>
+        </div>
+        <div id="interview-sheet" className="overflow-y-auto thin-scroll p-6 text-slate-800">
+          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>CloudSec Prep — Interview Sheet</h2>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>All {all.length} questions with takeaways and key points. One page per few questions when printed.</p>
+          {all.map((q, i) => (
+            <div key={q.id} style={{ marginBottom: 18, breakInside: 'avoid' }}>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>Q{i + 1}. {q.question}</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}><b>Takeaway:</b> {q.takeaway}</div>
+              <ul style={{ fontSize: 13, marginTop: 4, paddingLeft: 18, listStyle: 'disc' }}>
+                {q.keyPoints.map((k, j) => <li key={j}>{k}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- App ---------- */
 export default function App() {
   const { data } = useLocalQuestions();
@@ -183,6 +233,7 @@ export default function App() {
   const [predict, setPredict] = useState(false);
   const [checks, setChecks] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('cs-theme') || 'light');
   const timer = useRef<any>(null);
 
@@ -212,7 +263,7 @@ export default function App() {
     <div className="min-h-screen dark:bg-slate-950">
       <Header q={hq} onSearch={setHq} onMenu={() => setDrawer(!drawer)} theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
       <div className="flex max-w-[1440px] mx-auto items-start">
-        <Sidebar list={list} active={active} done={done} sq={sq} onSq={setSq} open={drawer}
+        <Sidebar list={list} active={active} done={done} sq={sq} onSq={setSq} open={drawer} onSheet={() => setSheet(true)}
           onClose={() => setDrawer(false)} onPick={(id: number) => { setActive(id); setDrawer(false); }} />
         <main className="flex-1 min-w-0 px-4 sm:px-8 py-6">
           <h1 className="text-[26px] sm:text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">{cur.question}</h1>
@@ -338,6 +389,7 @@ export default function App() {
           </div>
         </main>
       </div>
+      {sheet && <InterviewSheet all={all} onClose={() => setSheet(false)} />}
     </div>
   );
 }
