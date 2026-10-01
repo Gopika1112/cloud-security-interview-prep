@@ -17,6 +17,16 @@ function DynIcon({ name, size = 22 }: { name: string; size?: number }) {
 }
 const shortLabel = (t: string) => t.replace(/^Step \d+:\s*/, '');
 
+function useNarrow(bp = 640) {
+  const [n, setN] = useState(() => typeof window !== 'undefined' && window.innerWidth < bp);
+  useEffect(() => {
+    const f = () => setN(window.innerWidth < bp);
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, [bp]);
+  return n;
+}
+
 /* ---------- Header ---------- */
 function Header({ q, onSearch, onMenu, theme, onTheme }: { q: string; onSearch: (v: string) => void; onMenu: () => void; theme: string; onTheme: () => void }) {
   return (
@@ -111,6 +121,48 @@ function Stepper({ q, step }: { q: CloudQuestion; step: number }) {
 function SimCanvas({ q, step, playing }: { q: CloudQuestion; step: number; playing: boolean }) {
   const s = q.steps[step];
   const n = s.nodes.length;
+  const narrow = useNarrow();
+  const pktM = shortLabel(s.title).slice(0, 18) || 'REQUEST';
+  const retM = step > 0 ? shortLabel(q.steps[step - 1].title).slice(0, 18) + ' ✓' : '';
+  if (narrow) {
+    return (
+      <div>
+        <ol className="px-1 py-2">
+          {s.nodes.map((nd, i) => {
+            const lit = i <= s.focus, now = i === s.focus;
+            return (
+              <li key={i} className="flex gap-3">
+                <div className="flex flex-col items-center shrink-0 pt-1">
+                  <span className={`w-6 h-6 rounded-full grid place-items-center text-[11px] font-extrabold ${lit ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
+                    {i < s.focus ? <Icons.Check size={13} /> : i + 1}
+                  </span>
+                  {i < n - 1 && <span className={`w-[2.5px] flex-1 min-h-[26px] rounded ${i < s.focus ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-700'}`} />}
+                </div>
+                <div className={`flex-1 mb-2.5 border-2 rounded-xl px-3 py-2.5 flex items-center gap-3 bg-white dark:bg-slate-900 ${now ? 'border-blue-500 shadow-[0_4px_14px_-6px_rgba(37,99,235,.5)]' : lit ? 'border-emerald-200 dark:border-emerald-900' : 'border-slate-200 dark:border-slate-700 opacity-60'}`}>
+                  <span className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${now ? 'bg-blue-600 text-white' : lit ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
+                    <DynIcon name={nd.icon} size={19} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13.5px] font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{nd.label}</span>
+                    <span className="block text-[11.5px] text-slate-400">{nd.sub || `hop ${i + 1}`}</span>
+                    {now && <span className="inline-block mt-1 text-[10.5px] font-extrabold rounded px-1.5 py-0.5 bg-blue-600 text-white">▶ {pktM}</span>}
+                  </span>
+                  {i < s.focus && <Icons.CheckCircle2 size={18} className="text-emerald-500 shrink-0 ml-auto" />}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        {step > 0 && (
+          <div className="mx-1 mb-2 text-[12px] font-bold rounded-lg px-3 py-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300">↩ {retM || 'Confirmed'}</div>
+        )}
+        <div className="mx-1 bg-blue-50/70 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900 rounded-xl px-4 py-3 text-[13.5px]">
+          <span className="inline-block bg-blue-600 text-white text-[11px] font-bold rounded px-1.5 py-0.5 mr-2">STEP {step + 1}</span>
+          <span className="font-bold text-slate-800 dark:text-slate-100">{s.title}: </span><span className="text-slate-600 dark:text-slate-300">{s.description}</span>
+        </div>
+      </div>
+    );
+  }
   const W = 880, H = 300, pad = 90;
   const xs = (i: number) => (n === 1 ? W / 2 : pad + (i * (W - pad * 2)) / (n - 1));
   const y = 130;
@@ -191,7 +243,7 @@ function InterviewSheet({ all, onClose }: { all: CloudQuestion[]; onClose: () =>
     return () => window.removeEventListener('keydown', h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 grid place-items-center p-4 no-print" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 grid place-items-center p-2 sm:p-4 no-print" onClick={onClose}>
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700 no-print">
           <div className="font-extrabold text-[16px] dark:text-white">Interview sheet — all {all.length} takeaways</div>
@@ -409,8 +461,8 @@ export default function App() {
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-[15px]">{cur.shortDescription}</p>
           </div>
 
-          <div className="flex gap-3 items-start mt-4">
-            <div style={{ top: railTop }} className="flex flex-col shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] sticky self-start z-10 divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="flex gap-3 items-start mt-4 flex-col sm:flex-row">
+            <div style={{ top: railTop }} className="flex flex-row sm:flex-col w-full sm:w-auto shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-1.5 sm:p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] sticky self-start z-10 divide-x sm:divide-x-0 sm:divide-y divide-slate-100 dark:divide-slate-800">
               {([
                 { key: 'visual' as const, step: 'STEP 1', name: 'See it', Icon: Icons.Eye, hint: 'Watch the animation' },
                 { key: 'answer' as const, step: 'STEP 2', name: 'Say it', Icon: Icons.Mic, hint: 'Speak the 60s script' },
@@ -420,11 +472,11 @@ export default function App() {
                 const done_ = !!seen[`${active}-${key}`] && !isA;
                 return (
                   <button key={key} onClick={() => setTab(key)} title={`${name} — ${hint}`}
-                    className={`w-[118px] px-2.5 py-3 rounded-xl flex items-center gap-2.5 text-left transition-all ${isA ? 'bg-blue-600 text-white shadow' : done_ ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                    <Icon size={21} className="shrink-0" />
-                    <span className="flex flex-col leading-tight min-w-0">
-                      <span className={`text-[9.5px] font-extrabold tracking-wide ${isA ? 'text-blue-200' : done_ ? 'text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>{step}</span>
-                      <span className="text-[12.5px] font-bold flex items-center gap-1">{name}{done_ && <Icons.Check size={13} className="text-emerald-500" />}</span>
+                    className={`flex-1 sm:flex-none sm:w-[118px] px-2 py-2 sm:py-3 rounded-xl flex sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 text-left transition-all ${isA ? 'bg-blue-600 text-white shadow' : done_ ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                    <Icon size={20} className="shrink-0" />
+                    <span className="flex sm:flex-col flex-row items-baseline sm:items-start gap-1 sm:gap-0 leading-tight min-w-0">
+                      <span className={`text-[9px] sm:text-[9.5px] font-extrabold tracking-wide ${isA ? 'text-blue-200' : done_ ? 'text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>{step}</span>
+                      <span className="text-[11.5px] sm:text-[12.5px] font-bold flex items-center gap-1">{name}{done_ && <Icons.Check size={13} className="text-emerald-500" />}</span>
                     </span>
                   </button>
                 );
@@ -443,7 +495,7 @@ export default function App() {
                   <button onClick={() => { setStep((s) => Math.max(0, s - 1)); setPlaying(false); }} className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-600 grid place-items-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="prev"><Icons.SkipBack size={16} /></button>
                   <button onClick={() => { setStep((s) => Math.min(cur.steps.length - 1, s + 1)); setPlaying(false); if (step >= cur.steps.length - 2) markDone(); }} className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-600 grid place-items-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="next"><Icons.SkipForward size={16} /></button>
                   <input type="range" min={0} max={cur.steps.length - 1} value={step} onChange={(e) => { setStep(Number(e.target.value)); setPlaying(false); }}
-                    className="sim flex-1 min-w-[140px]" style={{ ['--fill' as any]: fill + '%' }} />
+                    className="sim w-full sm:w-auto sm:flex-1 sm:min-w-[140px] order-first sm:order-none" style={{ ['--fill' as any]: fill + '%' }} />
                   <span className="text-[13px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">Step {step + 1} of {cur.steps.length}</span>
                   <div className="relative">
                     <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="appearance-none border border-slate-200 dark:border-slate-600 rounded-lg text-[13px] font-semibold pl-3 pr-8 py-2 bg-white dark:bg-slate-800 dark:text-slate-100">
