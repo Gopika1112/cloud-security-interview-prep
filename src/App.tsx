@@ -3,8 +3,10 @@ import * as Icons from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { cloudSecurityQuestions, type CloudQuestion } from './data/cloudSecurityQuestions';
 import { interviewAnswers } from './data/interviewAnswers';
+import { questionMeta } from './data/questionMeta';
+import { followUps } from './data/followUps';
 
-const TOTAL = 20;
+const TOTAL = 50;
 
 function useLocalQuestions() {
   return useQuery({ queryKey: ['cloud-security-questions'], queryFn: async () => cloudSecurityQuestions.slice(0, TOTAL), staleTime: Infinity });
@@ -78,7 +80,7 @@ function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose, onSheet 
             {list.length === 0 && <div className="text-sm text-slate-500 p-4">No matches.</div>}
           </div>
           <button onClick={onSheet} className="mt-3 w-full border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl px-3 py-2.5 text-[13px] font-bold flex items-center justify-center gap-2">
-            <Icons.Printer size={16} /> Interview sheet — all 20
+            <Icons.Printer size={16} /> Interview sheet — print all
           </button>
         </div>
       </aside>
@@ -219,6 +221,92 @@ function InterviewSheet({ all, onClose }: { all: CloudQuestion[]; onClose: () =>
   );
 }
 
+/* ---------- Step-ordering quiz ---------- */
+function shuffled(n: number) {
+  const a = Array.from({ length: n }, (_, i) => i);
+  do {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  } while (a.every((v, i) => v === i) && n > 1);
+  return a;
+}
+function loadBest(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem('cs-quiz-best') || '{}'); } catch { return {}; }
+}
+function OrderQuiz({ q }: { q: CloudQuestion }) {
+  const n = q.steps.length;
+  const [order, setOrder] = useState<number[]>(() => shuffled(n));
+  const [sel, setSel] = useState<number | null>(null);
+  const [locked, setLocked] = useState<boolean[]>(() => Array(n).fill(false));
+  const [attempts, setAttempts] = useState(0);
+  const [checkedOnce, setCheckedOnce] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [best, setBest] = useState(loadBest);
+
+  useEffect(() => {
+    setOrder(shuffled(q.steps.length));
+    setSel(null); setLocked(Array(q.steps.length).fill(false));
+    setAttempts(0); setCheckedOnce(false); setRevealed(false);
+  }, [q.id, q.steps.length]);
+
+  const correctCount = order.filter((v, i) => v === i).length;
+  const solved = correctCount === n;
+
+  const tap = (pos: number) => {
+    if (locked[pos] || revealed) return;
+    if (sel === null) { setSel(pos); return; }
+    if (sel === pos) { setSel(null); return; }
+    const o = [...order]; [o[sel], o[pos]] = [o[pos], o[sel]];
+    setOrder(o); setSel(null); setCheckedOnce(false);
+  };
+  const check = () => {
+    const l = order.map((v, i) => v === i || locked[i]);
+    setLocked(l); setCheckedOnce(true);
+    const at = attempts + 1; setAttempts(at);
+    const c = order.filter((v, i) => v === i).length;
+    const prev = best[q.id] ?? 0;
+    if (c > prev) { const nb = { ...best, [q.id]: c }; setBest(nb); localStorage.setItem('cs-quiz-best', JSON.stringify(nb)); }
+  };
+  const retryWrong = () => { setCheckedOnce(false); setSel(null); };
+  const reveal = () => {
+    setOrder(Array.from({ length: n }, (_, i) => i));
+    setLocked(Array(n).fill(true)); setRevealed(true);
+  };
+
+  return (
+    <div>
+      <div className="font-bold text-[15.5px] dark:text-white">Put the flow in order</div>
+      <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">Tap one card, then tap another to swap them. Lock all {n} in sequence, then check.</p>
+      <ol className="mt-3 space-y-2">
+        {order.map((stepIdx, pos) => {
+          const ok = locked[pos] && order[pos] === pos;
+          const wrong = checkedOnce && !locked[pos];
+          return (
+            <li key={pos}>
+              <button onClick={() => tap(pos)} aria-label={`position ${pos + 1}: ${shortLabel(q.steps[stepIdx].title)}`}
+                className={`w-full text-left text-[13.5px] flex gap-2.5 items-center border rounded-xl px-3 py-2.5 transition-colors ${ok ? 'border-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/30 text-slate-700 dark:text-slate-200' : wrong ? 'shake border-red-300 bg-red-50/60 dark:bg-red-950/30 text-slate-700 dark:text-slate-200' : sel === pos ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-slate-700 dark:text-slate-200 ring-2 ring-blue-200 dark:ring-blue-800' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300'}`}>
+                <span className={`w-6 h-6 rounded-full grid place-items-center text-[12px] font-extrabold shrink-0 ${ok ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{ok ? <Icons.Check size={14} /> : pos + 1}</span>
+                <span className="flex-1">{shortLabel(q.steps[stepIdx].title)}</span>
+                {ok && <Icons.Lock size={14} className="text-emerald-500 shrink-0" />}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="flex items-center gap-2 mt-3 flex-wrap">
+        {!solved && !revealed && <button onClick={check} className="bg-blue-600 hover:bg-blue-700 text-white text-[13.5px] font-bold rounded-lg px-4 py-2">Check order</button>}
+        {checkedOnce && !solved && !revealed && <button onClick={retryWrong} className="border border-slate-200 dark:border-slate-600 text-[13.5px] font-bold rounded-lg px-4 py-2 text-slate-600 dark:text-slate-300">Try again</button>}
+        {!solved && !revealed && <button onClick={reveal} className="text-[13.5px] font-semibold text-slate-400 hover:text-slate-600 px-2 py-2">Reveal order</button>}
+        {revealed && <span className="text-[13px] text-slate-500">Order revealed — study it, then switch questions to try a fresh shuffle.</span>}
+      </div>
+      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-2">
+        {solved ? <span className="font-bold text-emerald-600">Correct order — nailed it{attempts > 0 ? ` in ${attempts} attempt${attempts > 1 ? 's' : ''}` : ''}.</span>
+          : `${correctCount} of ${n} in place${attempts > 0 ? ` · ${attempts} attempt${attempts > 1 ? 's' : ''}` : ''}`}
+        {(best[q.id] ?? 0) > 0 && <span> · best: {best[q.id]}/{n}</span>}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- App ---------- */
 export default function App() {
   const { data } = useLocalQuestions();
@@ -233,6 +321,10 @@ export default function App() {
   const [predict, setPredict] = useState(false);
   const [checks, setChecks] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [follow, setFollow] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('cs-notes') || '{}'); } catch { return {}; }
+  });
   const [sheet, setSheet] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('cs-theme') || 'light');
   const timer = useRef<any>(null);
@@ -242,7 +334,7 @@ export default function App() {
   const list = useMemo(() => all.filter((x) => !term || (x.question + ' ' + x.shortDescription + ' ' + x.keywords.join(' ')).toLowerCase().includes(term)), [all, term]);
   const cur = all.find((x) => x.id === active) ?? all[0];
 
-  useEffect(() => { setStep(0); setPlaying(true); setPredict(false); setTab('visual'); setChecks(new Set()); setCopied(false); }, [active]);
+  useEffect(() => { setStep(0); setPlaying(true); setPredict(false); setTab('visual'); setChecks(new Set()); setCopied(false); setFollow(false); }, [active]);
   useEffect(() => {
     if (!cur || !playing || tab !== 'visual') return;
     if (step >= cur.steps.length - 1) { setPlaying(false); return; }
@@ -257,6 +349,13 @@ export default function App() {
 
   if (!cur) return <div className="p-10 text-slate-500">Loading questions…</div>;
   const markDone = () => setDone((d) => new Set(d).add(cur.id));
+  const updateNote = (v: string) => {
+    setNotes((prev) => {
+      const n = { ...prev, [cur.id]: v };
+      localStorage.setItem('cs-notes', JSON.stringify(n));
+      return n;
+    });
+  };
   const fill = (step / Math.max(1, cur.steps.length - 1)) * 100;
 
   return (
@@ -351,8 +450,19 @@ export default function App() {
             });
             return (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 min-w-0 max-w-full overflow-hidden">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="font-bold text-[15.5px] dark:text-white">Interview answer — say it in 60 seconds</div>
+              </div>
+              {(() => { const m = questionMeta[cur.id]; return m ? (
+              <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                <span className="text-[11.5px] font-extrabold rounded-full px-2.5 py-1 bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300">{m.level}</span>
+                <span className={`text-[11.5px] font-extrabold rounded-full px-2.5 py-1 ${m.priority === 'Must-know' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{m.priority}</span>
+              </div>
+              ) : null; })()}
+              {questionMeta[cur.id] && (
+                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 italic">Interviewer intent: {questionMeta[cur.id].intent}</p>
+              )}
+              <div className="flex items-center gap-2 flex-wrap mt-3">
                 <button onClick={copy} className="border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold flex items-center gap-1.5">
                   {copied ? <><Icons.Check size={15} /> Copied!</> : <><Icons.Copy size={15} /> Copy answer</>}
                 </button>
@@ -379,10 +489,30 @@ export default function App() {
           {tab === 'practice' && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6">
               <div className="font-bold text-[15.5px] dark:text-white">Practice — explain this flow</div>
-              <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">Cover each step in order, then reveal the takeaway to check yourself.</p>
-              <ol className="mt-3 space-y-2">{cur.steps.map((s, i) => <li key={i} className="text-[13.5px] text-slate-600 dark:text-slate-300 flex gap-2"><span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 grid place-items-center text-[11px] font-bold shrink-0 mt-0.5">{i + 1}</span>{shortLabel(s.title)}</li>)}</ol>
-              <button onClick={() => setPredict(!predict)} className="mt-4 border border-blue-200 text-blue-600 rounded-lg px-3 py-1.5 text-sm font-semibold">{predict ? 'Hide takeaway' : 'Reveal takeaway'}</button>
+              <div className="mt-3"><OrderQuiz q={cur} /></div>
+              <div className="border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
+              <div className="text-[13.5px] font-bold dark:text-white">Then say the takeaway</div>
+              <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">Cover the order above from memory, then reveal the takeaway to check yourself.</p>
+              <button onClick={() => setPredict(!predict)} className="mt-3 border border-blue-200 text-blue-600 rounded-lg px-3 py-1.5 text-sm font-semibold">{predict ? 'Hide takeaway' : 'Reveal takeaway'}</button>
               {predict && <p className="mt-2 text-[13.5px] text-slate-700 bg-blue-50/60 border border-blue-100 rounded-xl p-3">{cur.takeaway}</p>}
+              </div>
+              {followUps[cur.id] && (
+              <div className="border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
+                <div className="text-[13.5px] font-bold dark:text-white flex items-center gap-2"><Icons.MessageCircleQuestion size={16} className="text-violet-500" /> Likely follow-up</div>
+                <p className="text-[13.5px] text-slate-700 dark:text-slate-200 mt-1.5 italic">"{followUps[cur.id].q}"</p>
+                <button onClick={() => setFollow(!follow)} className="mt-2.5 border border-violet-200 text-violet-600 rounded-lg px-3 py-1.5 text-sm font-semibold">{follow ? 'Hide model answer' : 'Reveal model answer'}</button>
+                {follow && <p className="mt-2 text-[13.5px] text-slate-700 dark:text-slate-200 bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900 rounded-xl p-3">{followUps[cur.id].a}</p>}
+              </div>
+              )}
+              <div className="border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
+                <div className="text-[13.5px] font-bold dark:text-white flex items-center gap-2"><Icons.NotebookPen size={16} className="text-slate-400" /> My notes
+                  {(notes[cur.id] || '').trim() && <button onClick={() => updateNote('')} className="ml-auto text-[12px] font-semibold text-slate-400 hover:text-red-500">Clear</button>}
+                </div>
+                <textarea value={notes[cur.id] || ''} onChange={(e) => updateNote(e.target.value)} rows={3}
+                  placeholder="Your mnemonics, reminders, tricky bits — auto-saved for this question…"
+                  className="mt-2 w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-xl p-3 text-[13.5px] outline-none focus:border-blue-400 resize-y min-h-[76px] placeholder:text-slate-400" />
+                <div className="text-[12px] text-slate-400 mt-1">{(notes[cur.id] || '').trim() ? `${(notes[cur.id] || '').trim().split(/\s+/).length} words · saved` : 'Nothing saved yet'}</div>
+              </div>
             </div>
           )}
             </div>
