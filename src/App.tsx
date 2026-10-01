@@ -232,7 +232,7 @@ function shuffled(n: number) {
 function loadBest(): Record<string, number> {
   try { return JSON.parse(localStorage.getItem('cs-quiz-best') || '{}'); } catch { return {}; }
 }
-function OrderQuiz({ q }: { q: CloudQuestion }) {
+function OrderQuiz({ q, onBest }: { q: CloudQuestion; onBest?: (qid: number, val: number) => void }) {
   const n = q.steps.length;
   const [order, setOrder] = useState<number[]>(() => shuffled(n));
   const [sel, setSel] = useState<number | null>(null);
@@ -264,7 +264,7 @@ function OrderQuiz({ q }: { q: CloudQuestion }) {
     const at = attempts + 1; setAttempts(at);
     const c = order.filter((v, i) => v === i).length;
     const prev = best[q.id] ?? 0;
-    if (c > prev) { const nb = { ...best, [q.id]: c }; setBest(nb); localStorage.setItem('cs-quiz-best', JSON.stringify(nb)); }
+    if (c > prev) { const nb = { ...best, [q.id]: c }; setBest(nb); localStorage.setItem('cs-quiz-best', JSON.stringify(nb)); onBest?.(q.id, c); }
   };
   const retryWrong = () => { setCheckedOnce(false); setSel(null); };
   const reveal = () => {
@@ -273,8 +273,11 @@ function OrderQuiz({ q }: { q: CloudQuestion }) {
   };
 
   return (
-    <div>
-      <div className="font-bold text-[15.5px] dark:text-white">Put the flow in order</div>
+    <div className="border-2 border-blue-100 dark:border-blue-900 rounded-xl p-4 bg-blue-50/40 dark:bg-blue-950/20">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="font-bold text-[15.5px] dark:text-white flex items-center gap-2"><Icons.ListOrdered size={17} className="text-blue-500" /> Put the flow in order</div>
+        <span className="text-[12px] font-extrabold rounded-full px-2.5 py-1 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 text-blue-600">{correctCount} of {n} in place</span>
+      </div>
       <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">Tap one card, then tap another to swap them. Lock all {n} in sequence, then check.</p>
       <ol className="mt-3 space-y-2">
         {order.map((stepIdx, pos) => {
@@ -298,9 +301,9 @@ function OrderQuiz({ q }: { q: CloudQuestion }) {
         {!solved && !revealed && <button onClick={reveal} className="text-[13.5px] font-semibold text-slate-400 hover:text-slate-600 px-2 py-2">Reveal order</button>}
         {revealed && <span className="text-[13px] text-slate-500">Order revealed — study it, then switch questions to try a fresh shuffle.</span>}
       </div>
-      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-2">
+      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-2.5 pt-2 border-t border-dashed border-blue-200 dark:border-blue-900">
         {solved ? <span className="font-bold text-emerald-600">Correct order — nailed it{attempts > 0 ? ` in ${attempts} attempt${attempts > 1 ? 's' : ''}` : ''}.</span>
-          : `${correctCount} of ${n} in place${attempts > 0 ? ` · ${attempts} attempt${attempts > 1 ? 's' : ''}` : ''}`}
+          : <span>{attempts > 0 ? `${attempts} attempt${attempts > 1 ? 's' : ''} so far · keep going` : 'Arrange the cards, then check'}</span>}
         {(best[q.id] ?? 0) > 0 && <span> · best: {best[q.id]}/{n}</span>}
       </div>
     </div>
@@ -321,9 +324,19 @@ export default function App() {
   const [predict, setPredict] = useState(false);
   const [checks, setChecks] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [showIntent, setShowIntent] = useState(false);
+  const [seen, setSeen] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('cs-seen') || '{}'); } catch { return {}; }
+  });
+  const [tLeft, setTLeft] = useState<number | null>(null);
+  const tickRef = useRef<any>(null);
   const [follow, setFollow] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem('cs-notes') || '{}'); } catch { return {}; }
+  });
+  const [quizBest, setQuizBest] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('cs-quiz-best') || '{}'); } catch { return {}; }
   });
   const [sheet, setSheet] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('cs-theme') || 'light');
@@ -336,12 +349,27 @@ export default function App() {
 
   useEffect(() => { setStep(0); setPlaying(true); setPredict(false); setTab('visual'); setChecks(new Set()); setCopied(false); setFollow(false); }, [active]);
   useEffect(() => {
+    try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+    if (tickRef.current) clearInterval(tickRef.current);
+    setSpeaking(false); setTLeft(null);
+  }, [active]);
+  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* noop */ } if (tickRef.current) clearInterval(tickRef.current); }, []);
+  useEffect(() => {
     if (!cur || !playing || tab !== 'visual') return;
     if (step >= cur.steps.length - 1) { setPlaying(false); return; }
     timer.current = setTimeout(() => setStep((s) => Math.min(s + 1, cur.steps.length - 1)), 2200 / speed);
     return () => clearTimeout(timer.current);
   }, [step, playing, speed, cur, active, tab]);
   useEffect(() => { localStorage.setItem('cs-done', JSON.stringify([...done])); }, [done]);
+  useEffect(() => {
+    setSeen((prev) => {
+      const k = `${active}-${tab}`;
+      if (prev[k]) return prev;
+      const n = { ...prev, [k]: true };
+      localStorage.setItem('cs-seen', JSON.stringify(n));
+      return n;
+    });
+  }, [tab, active]);
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('cs-theme', theme);
@@ -370,18 +398,24 @@ export default function App() {
 
           <div className="flex gap-3 items-start mt-4">
             <div className="flex flex-col shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] lg:sticky lg:top-[76px] divide-y divide-slate-100 dark:divide-slate-800">
-              <button onClick={() => setTab('visual')} title="See it — visual lesson" className={`w-[72px] py-3 rounded-xl flex flex-col items-center gap-1 transition-all ${tab === 'visual' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                <span className={`text-[10px] font-extrabold tracking-wide ${tab === 'visual' ? 'text-blue-200' : 'text-slate-300 dark:text-slate-600'}`}>STEP 1</span>
-                <Icons.Eye size={20} /><span className="text-[11.5px] font-bold">See it</span>
-              </button>
-              <button onClick={() => setTab('answer')} title="Say it — interview answer" className={`w-[72px] py-3 rounded-xl flex flex-col items-center gap-1 transition-all ${tab === 'answer' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                <span className={`text-[10px] font-extrabold tracking-wide ${tab === 'answer' ? 'text-blue-200' : 'text-slate-300 dark:text-slate-600'}`}>STEP 2</span>
-                <Icons.Mic size={20} /><span className="text-[11.5px] font-bold">Say it</span>
-              </button>
-              <button onClick={() => setTab('practice')} title="Nail it — practice" className={`w-[72px] py-3 rounded-xl flex flex-col items-center gap-1 transition-all ${tab === 'practice' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                <span className={`text-[10px] font-extrabold tracking-wide ${tab === 'practice' ? 'text-blue-200' : 'text-slate-300 dark:text-slate-600'}`}>STEP 3</span>
-                <Icons.Trophy size={20} /><span className="text-[11.5px] font-bold">Nail it</span>
-              </button>
+              {([
+                { key: 'visual' as const, step: 'STEP 1', name: 'See it', Icon: Icons.Eye, hint: 'Watch the animation' },
+                { key: 'answer' as const, step: 'STEP 2', name: 'Say it', Icon: Icons.Mic, hint: 'Speak the 60s script' },
+                { key: 'practice' as const, step: 'STEP 3', name: 'Nail it', Icon: Icons.Trophy, hint: 'Quiz + self-test' },
+              ]).map(({ key, step, name, Icon, hint }) => {
+                const isA = tab === key;
+                const done_ = !!seen[`${active}-${key}`] && !isA;
+                return (
+                  <button key={key} onClick={() => setTab(key)} title={`${name} — ${hint}`}
+                    className={`w-[118px] px-2.5 py-3 rounded-xl flex items-center gap-2.5 text-left transition-all ${isA ? 'bg-blue-600 text-white shadow' : done_ ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                    <Icon size={21} className="shrink-0" />
+                    <span className="flex flex-col leading-tight min-w-0">
+                      <span className={`text-[9.5px] font-extrabold tracking-wide ${isA ? 'text-blue-200' : done_ ? 'text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>{step}</span>
+                      <span className="text-[12.5px] font-bold flex items-center gap-1">{name}{done_ && <Icons.Check size={13} className="text-emerald-500" />}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="flex-1 min-w-0">
           {tab === 'visual' && (
@@ -448,28 +482,77 @@ export default function App() {
               const k = `${cur.id}-${i}`; const n = new Set(prev);
               if (n.has(k)) n.delete(k); else n.add(k); return n;
             });
+            const toggleSpeak = () => {
+              try {
+                const synth = window.speechSynthesis;
+                if (!synth) return;
+                if (speaking) { synth.cancel(); setSpeaking(false); return; }
+                const u = new SpeechSynthesisUtterance(script);
+                u.rate = 0.95;
+                u.onend = () => setSpeaking(false);
+                u.onerror = () => setSpeaking(false);
+                synth.cancel(); synth.speak(u); setSpeaking(true);
+              } catch { /* speech unsupported */ }
+            };
+            const toggleTimer = () => {
+              if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; setTLeft(null); return; }
+              setTLeft(60);
+              tickRef.current = setInterval(() => {
+                setTLeft((v) => {
+                  if (v === null || v <= 1) { if (tickRef.current) clearInterval(tickRef.current); tickRef.current = null; return 0; }
+                  return v - 1;
+                });
+              }, 1000);
+            };
+            const mmss = tLeft === null ? '' : `${Math.floor(tLeft / 60)}:${String(tLeft % 60).padStart(2, '0')}`;
             return (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 min-w-0 max-w-full overflow-hidden">
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 min-w-0 max-w-full overflow-hidden space-y-4">
+              <div className="bg-violet-50/70 dark:bg-violet-950/25 border border-violet-200 dark:border-violet-900 border-l-4 border-l-violet-500 rounded-xl p-4">
                 <div className="font-bold text-[15.5px] dark:text-white">Interview answer — say it in 60 seconds</div>
+                {(() => { const m = questionMeta[cur.id]; return m ? (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-[11.5px] font-extrabold rounded-full px-2.5 py-1 bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300">{m.level}</span>
+                  <span className={`text-[11.5px] font-extrabold rounded-full px-2.5 py-1 ${m.priority === 'Must-know' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{m.priority}</span>
+                </div>
+                ) : null; })()}
+                {questionMeta[cur.id] && (
+                  <div className="mt-2">
+                    <button onClick={() => setShowIntent(!showIntent)} className="text-[12.5px] font-bold text-violet-600 flex items-center gap-1 hover:text-violet-700">
+                      <Icons.Crosshair size={14} /> Why they ask this
+                      <Icons.ChevronDown size={14} className={`transition-transform ${showIntent ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showIntent && (
+                      <p className="text-[13px] text-slate-600 dark:text-slate-300 mt-1.5 pl-1">{questionMeta[cur.id].intent}</p>
+                    )}
+                  </div>
+                )}
               </div>
-              {(() => { const m = questionMeta[cur.id]; return m ? (
-              <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                <span className="text-[11.5px] font-extrabold rounded-full px-2.5 py-1 bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300">{m.level}</span>
-                <span className={`text-[11.5px] font-extrabold rounded-full px-2.5 py-1 ${m.priority === 'Must-know' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{m.priority}</span>
+              <div className="border-2 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl p-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[12px] font-extrabold tracking-wide text-blue-500 uppercase">Your script</div>
+                  <div className="flex gap-2">
+                  <button onClick={toggleSpeak} className="border border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold flex items-center gap-1.5">
+                    {speaking ? <><Icons.Square size={14} /> Stop</> : <><Icons.Volume2 size={15} /> Listen</>}
+                  </button>
+                  <button onClick={copy} className="border border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold flex items-center gap-1.5">
+                    {copied ? <><Icons.Check size={15} /> Copied!</> : <><Icons.Copy size={15} /> Copy answer</>}
+                  </button>
+                  </div>
+                </div>
+                <p className="text-[15px] text-slate-700 dark:text-slate-200 mt-2.5 leading-[1.75] border-l-[3px] border-blue-500 pl-4 min-w-0 break-words">{script}</p>
+                <div className="mt-2.5 pt-2.5 border-t border-dashed border-blue-200 dark:border-blue-900 flex items-center gap-2 flex-wrap">
+                  <span className="text-[12px] font-bold rounded-full px-2.5 py-1 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 text-blue-600">≈{words} words · ~{secs}s spoken</span>
+                  {tLeft === null ? (
+                    <button onClick={toggleTimer} className="text-[12px] font-bold rounded-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5"><Icons.Timer size={14} /> Rehearse 60s</button>
+                  ) : tLeft > 0 ? (
+                    <button onClick={toggleTimer} className="text-[12px] font-bold rounded-full px-3 py-1.5 bg-amber-500 text-white flex items-center gap-1.5 tabular-nums"><Icons.Timer size={14} /> {mmss} — stop</button>
+                  ) : (
+                    <span className="text-[12px] font-bold rounded-full px-3 py-1.5 bg-emerald-500 text-white flex items-center gap-1.5"><Icons.Check size={14} /> Time! Did you finish?</span>
+                  )}
+                </div>
               </div>
-              ) : null; })()}
-              {questionMeta[cur.id] && (
-                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 italic">Interviewer intent: {questionMeta[cur.id].intent}</p>
-              )}
-              <div className="flex items-center gap-2 flex-wrap mt-3">
-                <button onClick={copy} className="border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold flex items-center gap-1.5">
-                  {copied ? <><Icons.Check size={15} /> Copied!</> : <><Icons.Copy size={15} /> Copy answer</>}
-                </button>
-              </div>
-              <p className="text-[15px] text-slate-700 dark:text-slate-200 mt-3 leading-[1.75] border-l-[3px] border-blue-500 pl-4 min-w-0 break-words">{script}</p>
-              <div className="text-[12px] text-slate-400 mt-2">≈{words} words · ~{secs} seconds spoken</div>
-              <div className="font-bold text-[13.5px] mt-5 mb-2 dark:text-white">Hit these 3 points:</div>
+              <div className="border-2 border-emerald-100 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl p-4">
+              <div className="font-bold text-[13.5px] mb-2 dark:text-white">Hit these 3 points:</div>
               <ul className="space-y-2">{cur.keyPoints.map((k, i) => {
                 const on = checks.has(`${cur.id}-${i}`);
                 return (
@@ -482,36 +565,44 @@ export default function App() {
                   </li>
                 );
               })}</ul>
-              <button onClick={() => setTab('visual')} className="mt-4 text-blue-600 text-sm font-semibold">← Watch the visual lesson</button>
+              </div>
+              <button onClick={() => setTab('visual')} className="text-blue-600 text-sm font-semibold">← Watch the visual lesson</button>
             </div>
             );
           })()}
           {tab === 'practice' && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 space-y-4">
               <div className="font-bold text-[15.5px] dark:text-white">Practice — explain this flow</div>
-              <div className="mt-3"><OrderQuiz q={cur} /></div>
-              <div className="border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
-              <div className="text-[13.5px] font-bold dark:text-white">Then say the takeaway</div>
+              <div className="min-w-0"><OrderQuiz q={cur} onBest={(qid, v) => setQuizBest((p) => ({ ...p, [qid]: v }))} /></div>
+              <div className="border-2 border-emerald-100 dark:border-emerald-900 rounded-xl p-4 bg-emerald-50/40 dark:bg-emerald-950/20 min-w-0">
+              <div className="text-[13.5px] font-bold dark:text-white flex items-center gap-2"><Icons.MessageCircle size={16} className="text-emerald-500" /> Then say the takeaway</div>
               <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">Cover the order above from memory, then reveal the takeaway to check yourself.</p>
-              <button onClick={() => setPredict(!predict)} className="mt-3 border border-blue-200 text-blue-600 rounded-lg px-3 py-1.5 text-sm font-semibold">{predict ? 'Hide takeaway' : 'Reveal takeaway'}</button>
-              {predict && <p className="mt-2 text-[13.5px] text-slate-700 bg-blue-50/60 border border-blue-100 rounded-xl p-3">{cur.takeaway}</p>}
+              <button onClick={() => setPredict(!predict)} className="mt-3 border border-emerald-200 text-emerald-600 rounded-lg px-3 py-1.5 text-sm font-semibold">{predict ? 'Hide takeaway' : 'Reveal takeaway'}</button>
+              {predict && <p className="mt-2 text-[13.5px] text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-emerald-100 dark:border-emerald-900 rounded-xl p-3">{cur.takeaway}</p>}
               </div>
               {followUps[cur.id] && (
-              <div className="border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
+              <div className="border-2 border-violet-100 dark:border-violet-900 rounded-xl p-4 bg-violet-50/40 dark:bg-violet-950/20">
                 <div className="text-[13.5px] font-bold dark:text-white flex items-center gap-2"><Icons.MessageCircleQuestion size={16} className="text-violet-500" /> Likely follow-up</div>
                 <p className="text-[13.5px] text-slate-700 dark:text-slate-200 mt-1.5 italic">"{followUps[cur.id].q}"</p>
                 <button onClick={() => setFollow(!follow)} className="mt-2.5 border border-violet-200 text-violet-600 rounded-lg px-3 py-1.5 text-sm font-semibold">{follow ? 'Hide model answer' : 'Reveal model answer'}</button>
-                {follow && <p className="mt-2 text-[13.5px] text-slate-700 dark:text-slate-200 bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900 rounded-xl p-3">{followUps[cur.id].a}</p>}
+                {follow && <p className="mt-2 text-[13.5px] text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-violet-100 dark:border-violet-900 rounded-xl p-3">{followUps[cur.id].a}</p>}
               </div>
               )}
-              <div className="border-t border-slate-100 dark:border-slate-800 mt-5 pt-4">
+              <div className="border-2 border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50/60 dark:bg-slate-800/40">
                 <div className="text-[13.5px] font-bold dark:text-white flex items-center gap-2"><Icons.NotebookPen size={16} className="text-slate-400" /> My notes
-                  {(notes[cur.id] || '').trim() && <button onClick={() => updateNote('')} className="ml-auto text-[12px] font-semibold text-slate-400 hover:text-red-500">Clear</button>}
+                  <span className="ml-auto text-[12px] font-semibold text-slate-400">{(notes[cur.id] || '').trim() ? `${(notes[cur.id] || '').trim().split(/\s+/).length} words · saved` : 'Nothing saved yet'}</span>
+                  {(notes[cur.id] || '').trim() && <button onClick={() => updateNote('')} className="text-[12px] font-semibold text-slate-400 hover:text-red-500">Clear</button>}
                 </div>
                 <textarea value={notes[cur.id] || ''} onChange={(e) => updateNote(e.target.value)} rows={3}
                   placeholder="Your mnemonics, reminders, tricky bits — auto-saved for this question…"
-                  className="mt-2 w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-xl p-3 text-[13.5px] outline-none focus:border-blue-400 resize-y min-h-[76px] placeholder:text-slate-400" />
-                <div className="text-[12px] text-slate-400 mt-1">{(notes[cur.id] || '').trim() ? `${(notes[cur.id] || '').trim().split(/\s+/).length} words · saved` : 'Nothing saved yet'}</div>
+                  className="mt-2 w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 rounded-xl p-3 text-[13.5px] outline-none focus:border-blue-400 resize-y min-h-[76px] placeholder:text-slate-400" />
+              </div>
+              <div className="flex items-center gap-2.5 flex-wrap border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 rounded-xl px-4 py-3">
+                <span className="text-[12.5px] font-bold text-slate-600 dark:text-slate-300">Session summary:</span>
+                <span className="text-[12px] font-semibold rounded-full px-2.5 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Quiz best {(quizBest[cur.id] ?? 0)}/{cur.steps.length}</span>
+                <span className={`text-[12px] font-semibold rounded-full px-2.5 py-1 ${predict ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>Takeaway {predict ? 'reviewed ✓' : 'not yet'}</span>
+                <span className="text-[12px] font-semibold rounded-full px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">{(notes[cur.id] || '').trim() ? `${(notes[cur.id] || '').trim().split(/\s+/).length} note words` : 'No notes yet'}</span>
+                <button onClick={() => { setActive(active % TOTAL + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold rounded-lg px-4 py-2">Next question →</button>
               </div>
             </div>
           )}
