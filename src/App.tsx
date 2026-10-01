@@ -58,7 +58,7 @@ function Header({ q, onSearch, onMenu, theme, onTheme }: { q: string; onSearch: 
 }
 
 /* ---------- Sidebar ---------- */
-function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose, onSheet }: any) {
+function Sidebar({ list, active, highlight, done, onPick, sq, onSq, open, onClose, onSheet, onReset }: any) {
   const pct = Math.round((done.size / TOTAL) * 100);
   return (
     <>
@@ -67,17 +67,19 @@ function Sidebar({ list, active, done, onPick, sq, onSq, open, onClose, onSheet 
         <div className="p-5">
           <div className="text-[19px] font-extrabold text-slate-900 dark:text-white">Cloud Security <span className="text-slate-400 font-normal text-[15px]">• {TOTAL} Questions</span></div>
           <div className="h-[7px] bg-slate-100 dark:bg-slate-700 rounded-full mt-3 overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: pct + '%' }} /></div>
-          <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">{done.size} / {TOTAL} completed</div>
+          <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium flex items-center">{done.size} / {TOTAL} completed
+            {done.size > 0 && <button onClick={onReset} className="ml-auto text-[12px] font-semibold text-slate-400 hover:text-red-500">Reset</button>}
+          </div>
           <div className="relative mt-4">
             <Icons.Search size={15} className="absolute left-3 top-[10px] text-slate-400" />
             <input value={sq} onChange={(e) => onSq(e.target.value)} placeholder="Search questions..."
               className="w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg pl-9 pr-2 py-2 text-[13px] outline-none focus:border-blue-400" />
           </div>
-          <div className="mt-2 max-h-[calc(100vh-300px)] min-h-[300px] overflow-y-auto thin-scroll divide-y divide-slate-100 dark:divide-slate-700">
+          <div id="q-list" className="mt-2 max-h-[calc(100vh-300px)] min-h-[300px] overflow-y-auto thin-scroll divide-y divide-slate-100 dark:divide-slate-700">
             {list.map((x: CloudQuestion, i: number) => {
-              const isA = active === x.id;
+              const isA = highlight && active === x.id;
               return (
-                <button key={x.id} onClick={() => onPick(x.id)}
+                <button key={x.id} onClick={() => onPick(x.id)} data-active={isA ? 'true' : undefined}
                   className={`w-full text-left flex items-center gap-3 pl-2 pr-1 py-[11px] rounded-lg border-l-4 ${isA ? 'bg-blue-50/80 dark:bg-blue-950/60 border-blue-500' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                   <span className={`text-[13px] w-6 font-medium ${isA ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>{String(i + 1).padStart(2, '0')}</span>
                   <span className={`text-[13.5px] flex-1 leading-snug ${isA ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-300'}`}>{x.question}</span>
@@ -403,6 +405,10 @@ export default function App() {
 
   useEffect(() => { setStep(0); setPlaying(true); setPredict(false); setTab('visual'); setChecks(new Set()); setCopied(false); setFollow(false); }, [active]);
   useEffect(() => {
+    window.scrollTo(0, 0);
+    document.getElementById('q-list')?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [active]);
+  useEffect(() => {
     try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
     if (tickRef.current) clearInterval(tickRef.current);
     setSpeaking(false); setTLeft(null);
@@ -453,16 +459,17 @@ export default function App() {
     <div className="min-h-screen dark:bg-slate-950">
       <Header q={hq} onSearch={setHq} onMenu={() => setDrawer(!drawer)} theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
       <div className="flex max-w-[1440px] mx-auto items-start">
-        <Sidebar list={list} active={active} done={done} sq={sq} onSq={setSq} open={drawer} onSheet={() => setSheet(true)}
+        <Sidebar list={list} active={active} highlight done={done} sq={sq} onSq={setSq} open={drawer} onSheet={() => setSheet(true)}
+          onReset={() => { setDone(new Set()); localStorage.removeItem('cs-done'); }}
           onClose={() => setDrawer(false)} onPick={(id: number) => { setActive(id); setDrawer(false); }} />
-        <main className="flex-1 min-w-0 px-4 sm:px-8 py-6">
+        <main className="flex-1 min-w-0 px-4 sm:px-8 py-6 flex flex-col self-stretch">
           <div ref={qbarRef} className="sticky top-[60px] z-10 bg-[#f7f9fc] dark:bg-slate-950 pt-1 pb-3 -mx-1 px-1">
           <h1 className="text-[26px] sm:text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">{cur.question}</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-[15px]">{cur.shortDescription}</p>
           </div>
 
           <div className="flex gap-3 items-start mt-4 flex-col sm:flex-row">
-            <div style={{ top: railTop }} className="flex flex-row sm:flex-col w-full sm:w-auto shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-1.5 sm:p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] sticky self-start z-10 divide-x sm:divide-x-0 sm:divide-y divide-slate-100 dark:divide-slate-800">
+            <div style={{ top: railTop }} className="flex flex-row sm:flex-col w-full sm:w-auto shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-1.5 sm:p-2 shadow-[0_2px_12px_-4px_rgba(15,30,61,.08)] sm:sticky self-start z-10 divide-x sm:divide-x-0 sm:divide-y divide-slate-100 dark:divide-slate-800">
               {([
                 { key: 'visual' as const, step: 'STEP 1', name: 'See it', Icon: Icons.Eye, hint: 'Watch the animation' },
                 { key: 'answer' as const, step: 'STEP 2', name: 'Say it', Icon: Icons.Mic, hint: 'Speak the 60s script' },
@@ -667,12 +674,12 @@ export default function App() {
                 <span className="text-[12px] font-semibold rounded-full px-2.5 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Quiz best {(quizBest[cur.id] ?? 0)}/{cur.steps.length}</span>
                 <span className={`text-[12px] font-semibold rounded-full px-2.5 py-1 ${predict ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>Takeaway {predict ? 'reviewed ✓' : 'not yet'}</span>
                 <span className="text-[12px] font-semibold rounded-full px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">{(notes[cur.id] || '').trim() ? `${(notes[cur.id] || '').trim().split(/\s+/).length} note words` : 'No notes yet'}</span>
-                <button onClick={() => { setActive(active % TOTAL + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold rounded-lg px-4 py-2">Next question →</button>
+                <button onClick={() => setActive(active % TOTAL + 1)} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold rounded-lg px-4 py-2">Next question →</button>
               </div>
             </div>
           )}
             </div>
-          </div>
+            </div>
         </main>
       </div>
       {sheet && <InterviewSheet all={all} onClose={() => setSheet(false)} />}
