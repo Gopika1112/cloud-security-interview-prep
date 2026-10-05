@@ -366,50 +366,6 @@ function OrderQuiz({ q, onBest }: { q: CloudQuestion; onBest?: (qid: number, val
 }
 
 /* ---------- Home (welcome view, in-app — not a separate page) ---------- */
-function HowItWorksDemo() {
-  const [hot, setHot] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setHot((s) => (s + 1) % 3), 2400);
-    return () => clearInterval(t);
-  }, []);
-  const ring = (i: number) => (i === hot ? 'border-blue-500 shadow-[0_8px_24px_-10px_rgba(37,99,235,.55)]' : 'border-slate-200 dark:border-slate-700');
-  return (
-    <div className="mt-6">
-      <div className="font-bold text-[15px] dark:text-white">How this works</div>
-      <div className="grid sm:grid-cols-3 gap-4 mt-3">
-        <div className={`pop bg-white dark:bg-slate-900 border-2 rounded-2xl p-4 transition-shadow ${ring(0)}`}>
-          <span className="w-10 h-10 rounded-xl bg-blue-600 text-white grid place-items-center"><Icons.Eye size={20} /></span>
-          <div className="font-bold text-[14px] mt-2 dark:text-white">1. See it</div>
-          <div className="flex items-center gap-1 mt-2 flex-wrap">
-            {['User', 'Role', 'Allow'].map((n) => (
-              <span key={n} className="text-[11.5px] font-bold rounded-lg px-2 py-1 border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">{n}</span>
-            ))}
-            <span className="text-[11px] font-bold rounded-full px-2 py-1 bg-blue-600 text-white packet-pill">REQUEST ▸</span>
-          </div>
-          <p className="text-[12.5px] text-slate-500 dark:text-slate-400 mt-2">Watch the animated flow first.</p>
-        </div>
-        <div className={`pop bg-white dark:bg-slate-900 border-2 rounded-2xl p-4 transition-shadow ${ring(1)}`} style={{ animationDelay: '.15s' }}>
-          <span className="w-10 h-10 rounded-xl bg-violet-600 text-white grid place-items-center"><Icons.Mic size={20} /></span>
-          <div className="font-bold text-[14px] mt-2 dark:text-white">2. Say it</div>
-          <p className="text-[12.5px] text-slate-600 dark:text-slate-300 mt-2 leading-relaxed border-l-[3px] border-violet-500 pl-2">"Grant only the exact permissions a workload needs…"</p>
-          <span className="inline-block mt-2 text-[11px] font-bold rounded-full px-2 py-0.5 bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 pulse-dot">≈60s spoken</span>
-        </div>
-        <div className={`pop bg-white dark:bg-slate-900 border-2 rounded-2xl p-4 transition-shadow ${ring(2)}`} style={{ animationDelay: '.3s' }}>
-          <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white grid place-items-center"><Icons.Trophy size={20} /></span>
-          <div className="font-bold text-[14px] mt-2 dark:text-white">3. Nail it</div>
-          <div className="mt-2 space-y-1.5">
-            <div className="text-[12px] font-semibold flex items-center gap-1.5 border border-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/30 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1">
-              <span className="w-4 h-4 rounded-full grid place-items-center bg-emerald-500 text-white"><Icons.Check size={11} /></span>Scope the role ✓
-            </div>
-            <div className="text-[12px] font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-lg px-2 py-1">
-              <span className="w-4 h-4 rounded-full grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-extrabold">2</span>Trim excess rights
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<number>; onOpen: (id: number, tab?: 'visual' | 'answer' | 'practice') => void }) {
   const groups: { title: string; desc: string; color: string; ids: number[] }[] = [
     { title: 'Fresher', desc: 'Core concepts every fresher must be able to explain.', color: 'text-emerald-600', ids: all.filter((x) => (questionMeta[x.id]?.level ?? 'Fresher') === 'Fresher').map((x) => x.id) },
@@ -417,24 +373,31 @@ function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<numbe
   ];
   return (
     <div className="flex-1 min-w-0 px-4 sm:px-8 py-6">
-      <div className="text-[12px] font-extrabold tracking-wide text-blue-600 uppercase">Top 50 for cloud security</div>
-      <h1 className="text-[26px] sm:text-[36px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight mt-1">Cloud Security Interview Questions</h1>
-      <p className="text-slate-500 dark:text-slate-400 mt-2 text-[14px] sm:text-[15px] max-w-[720px]">50 questions, ordered for learning. Each one has an animated visual lesson that shows what really happens, an interview-ready 60-second answer, and a quick check to test yourself.</p>
-      <div className="flex flex-col sm:flex-row gap-3 mt-4">
-        <button onClick={() => onOpen(all[0].id)} className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5 py-3 text-[14px] flex items-center justify-center gap-2">
+      <div className="text-left text-[14px] sm:text-[15px] font-extrabold tracking-widest text-blue-600 uppercase">Top 50 for cloud security</div>
+      <h1 className="text-left text-[44px] sm:text-[64px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.05] mt-2">Cloud Security Interview Questions</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-3">
+        <p className="text-left text-slate-500 dark:text-slate-400 text-[15px] sm:text-[17px] max-w-[760px] flex-1">50 questions, ordered for learning. Each one has an animated visual lesson that shows what really happens, an interview-ready 60-second answer, and a quick check to test yourself.</p>
+        <button onClick={() => onOpen(all[0].id)} className="w-full sm:w-auto shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5 py-3 text-[14px] flex items-center justify-center gap-2">
           <Icons.Play size={16} /> Start learning
         </button>
       </div>
-      <HowItWorksDemo />
-      <div className="grid sm:grid-cols-3 gap-4 mt-6">
+      <div className="mt-8">
+        <div className="text-[11.5px] font-extrabold tracking-widest text-blue-600 uppercase">How it works</div>
+        <h2 className="text-[20px] sm:text-[24px] font-extrabold text-slate-900 dark:text-white tracking-tight mt-0.5">Learn in 3 steps</h2>
+        <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">Every question follows the same loop — watch, speak, prove.</p>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-4 mt-4">
         {[
-          { Icon: Icons.Eye, name: 'Visual lesson', desc: 'Step-by-step animations with the key terms explained as they appear.', tab: 'visual' as const, cta: 'Watch it' },
-          { Icon: Icons.Mic, name: 'Interview answer', desc: 'A 60-second answer with takeaways, key points and likely follow-ups.', tab: 'answer' as const, cta: 'Say it' },
-          { Icon: Icons.Trophy, name: 'Quick check', desc: 'Ordering quiz and self-tests to confirm you really understood it.', tab: 'practice' as const, cta: 'Try it' },
-        ].map(({ Icon, name, desc, tab, cta }, i) => (
+          { Icon: Icons.Eye, name: 'Visual lesson', desc: 'Step-by-step animations with the key terms explained as they appear.', tab: 'visual' as const, cta: 'Watch it', time: '~2 min' },
+          { Icon: Icons.Mic, name: 'Interview answer', desc: 'A 60-second answer with takeaways, key points and likely follow-ups.', tab: 'answer' as const, cta: 'Say it', time: '~1 min' },
+          { Icon: Icons.Trophy, name: 'Quick check', desc: 'Ordering quiz and self-tests to confirm you really understood it.', tab: 'practice' as const, cta: 'Try it', time: '~2 min' },
+        ].map(({ Icon, name, desc, tab, cta, time }, i) => (
           <button key={name} onClick={() => onOpen(all[0].id, tab)} title={`${cta} — opens Q1 in ${name} mode`}
             className="pop group text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 transition-all hover:-translate-y-1 hover:shadow-[0_12px_28px_-12px_rgba(37,99,235,.45)] hover:border-blue-300 cursor-pointer" style={{ animationDelay: `${i * 0.15}s` }}>
-            <span className="inline-grid place-items-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 pulse-dot"><Icon size={20} className="text-blue-500" /></span>
+            <div className="flex items-start">
+              <span className="inline-grid place-items-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 pulse-dot"><Icon size={20} className="text-blue-500" /></span>
+              <span className="ml-auto text-[11px] font-extrabold rounded-full px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">{time}</span>
+            </div>
             <div className="font-bold text-[15px] mt-2.5 dark:text-white">{name}</div>
             <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">{desc}</p>
             {i === 0 && (
