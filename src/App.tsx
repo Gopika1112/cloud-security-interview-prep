@@ -258,7 +258,7 @@ function InterviewSheet({ all, onClose }: { all: CloudQuestion[]; onClose: () =>
             <button onClick={onClose} aria-label="Close" className="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-[13px] font-bold text-slate-500 dark:text-slate-300 grid place-items-center shrink-0"><Icons.X size={15} /></button>
           </div>
         </div>
-        <div id="interview-sheet" className="overflow-y-auto thin-scroll p-6 text-slate-800">
+        <div id="interview-sheet" className="overflow-y-auto thin-scroll p-6 text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
           <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>CloudSec Prep — Interview Sheet</h2>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>All {all.length} questions with takeaways and key points. One page per few questions when printed.</p>
           {all.map((q, i) => (
