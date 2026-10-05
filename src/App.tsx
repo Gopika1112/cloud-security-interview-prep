@@ -28,17 +28,18 @@ function useNarrow(bp = 640) {
 }
 
 /* ---------- Header ---------- */
-function Header({ q, onSearch, onMenu, theme, onTheme }: { q: string; onSearch: (v: string) => void; onMenu: () => void; theme: string; onTheme: () => void }) {
+function Header({ q, onSearch, onMenu, onHome, view, theme, onTheme }: { q: string; onSearch: (v: string) => void; onMenu: () => void; onHome: () => void; view: string; theme: string; onTheme: () => void }) {
   return (
     <header className="sticky top-0 z-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
       <div className="flex items-center gap-4 px-4 h-[60px] max-w-[1440px] mx-auto">
         <button className="lg:hidden p-2 border border-slate-200 dark:border-slate-600 rounded-lg" onClick={onMenu} aria-label="menu"><Icons.Menu size={18} /></button>
-        <div className="flex items-center gap-2">
+        <button onClick={onHome} className="flex items-center gap-2" aria-label="home" title="Home">
           <span className="w-9 h-9 rounded-xl bg-blue-600 grid place-items-center text-white shadow-[0_4px_10px_-2px_rgba(13,148,136,.5)]"><Icons.ShieldCheck size={20} /></span>
           <span className="font-extrabold text-[22px] tracking-tight"><span className="text-blue-600">CloudSec</span><span className="text-slate-900 dark:text-white">Prep</span></span>
-        </div>
+        </button>
         <nav className="hidden md:flex items-stretch gap-6 text-[14px] ml-4 h-[60px]">
-          <span className="text-blue-600 font-semibold border-b-[3px] border-blue-600 flex items-center">Cloud Security Interview Lab</span>
+          <button onClick={onHome} className={`flex items-center border-b-[3px] font-semibold ${view === 'home' ? 'text-blue-600 border-blue-600' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-blue-600'}`}>Home</button>
+          <span className={`font-semibold border-b-[3px] flex items-center ${view === 'learn' ? 'text-blue-600 border-blue-600' : 'text-slate-500 dark:text-slate-400 border-transparent'}`}>Cloud Security Interview Lab</span>
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <div className="relative hidden sm:block w-[300px]">
@@ -247,14 +248,14 @@ function InterviewSheet({ all, onClose }: { all: CloudQuestion[]; onClose: () =>
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 grid place-items-center p-2 sm:p-4 no-print" onClick={onClose}>
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700 no-print">
-          <div className="font-extrabold text-[16px] dark:text-white">Interview sheet — all {all.length} takeaways</div>
-          <div className="ml-auto flex gap-2">
-            <button onClick={copyAll} className="border border-blue-200 text-blue-600 rounded-lg px-3 py-1.5 text-[13px] font-bold flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border-b border-slate-200 dark:border-slate-700 no-print">
+          <div className="font-extrabold text-[15px] sm:text-[16px] dark:text-white leading-snug">Interview sheet — all {all.length} takeaways</div>
+          <div className="flex sm:ml-auto gap-2 w-full sm:w-auto">
+            <button onClick={copyAll} className="flex-1 sm:flex-none border border-blue-200 text-blue-600 rounded-lg px-3 py-2 text-[13px] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap">
               {copied ? <><Icons.Check size={15} /> Copied!</> : <><Icons.Copy size={15} /> Copy all</>}
             </button>
-            <button onClick={() => window.print()} className="bg-blue-600 text-white rounded-lg px-3 py-1.5 text-[13px] font-bold flex items-center gap-1.5"><Icons.Printer size={15} /> Print</button>
-            <button onClick={onClose} className="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-[13px] font-bold text-slate-500 dark:text-slate-300"><Icons.X size={15} /></button>
+            <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-blue-600 text-white rounded-lg px-3 py-2 text-[13px] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap"><Icons.Printer size={15} /> Print</button>
+            <button onClick={onClose} aria-label="Close" className="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-[13px] font-bold text-slate-500 dark:text-slate-300 grid place-items-center shrink-0"><Icons.X size={15} /></button>
           </div>
         </div>
         <div id="interview-sheet" className="overflow-y-auto thin-scroll p-6 text-slate-800">
@@ -364,6 +365,161 @@ function OrderQuiz({ q, onBest }: { q: CloudQuestion; onBest?: (qid: number, val
   );
 }
 
+/* ---------- Home (welcome view, in-app — not a separate page) ---------- */
+function HowItWorksDemo() {
+  const [hot, setHot] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setHot((s) => (s + 1) % 3), 2400);
+    return () => clearInterval(t);
+  }, []);
+  const ring = (i: number) => (i === hot ? 'border-blue-500 shadow-[0_8px_24px_-10px_rgba(37,99,235,.55)]' : 'border-slate-200 dark:border-slate-700');
+  return (
+    <div className="mt-6">
+      <div className="font-bold text-[15px] dark:text-white">How this works</div>
+      <div className="grid sm:grid-cols-3 gap-4 mt-3">
+        <div className={`pop bg-white dark:bg-slate-900 border-2 rounded-2xl p-4 transition-shadow ${ring(0)}`}>
+          <span className="w-10 h-10 rounded-xl bg-blue-600 text-white grid place-items-center"><Icons.Eye size={20} /></span>
+          <div className="font-bold text-[14px] mt-2 dark:text-white">1. See it</div>
+          <div className="flex items-center gap-1 mt-2 flex-wrap">
+            {['User', 'Role', 'Allow'].map((n) => (
+              <span key={n} className="text-[11.5px] font-bold rounded-lg px-2 py-1 border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">{n}</span>
+            ))}
+            <span className="text-[11px] font-bold rounded-full px-2 py-1 bg-blue-600 text-white packet-pill">REQUEST ▸</span>
+          </div>
+          <p className="text-[12.5px] text-slate-500 dark:text-slate-400 mt-2">Watch the animated flow first.</p>
+        </div>
+        <div className={`pop bg-white dark:bg-slate-900 border-2 rounded-2xl p-4 transition-shadow ${ring(1)}`} style={{ animationDelay: '.15s' }}>
+          <span className="w-10 h-10 rounded-xl bg-violet-600 text-white grid place-items-center"><Icons.Mic size={20} /></span>
+          <div className="font-bold text-[14px] mt-2 dark:text-white">2. Say it</div>
+          <p className="text-[12.5px] text-slate-600 dark:text-slate-300 mt-2 leading-relaxed border-l-[3px] border-violet-500 pl-2">"Grant only the exact permissions a workload needs…"</p>
+          <span className="inline-block mt-2 text-[11px] font-bold rounded-full px-2 py-0.5 bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 pulse-dot">≈60s spoken</span>
+        </div>
+        <div className={`pop bg-white dark:bg-slate-900 border-2 rounded-2xl p-4 transition-shadow ${ring(2)}`} style={{ animationDelay: '.3s' }}>
+          <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white grid place-items-center"><Icons.Trophy size={20} /></span>
+          <div className="font-bold text-[14px] mt-2 dark:text-white">3. Nail it</div>
+          <div className="mt-2 space-y-1.5">
+            <div className="text-[12px] font-semibold flex items-center gap-1.5 border border-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/30 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1">
+              <span className="w-4 h-4 rounded-full grid place-items-center bg-emerald-500 text-white"><Icons.Check size={11} /></span>Scope the role ✓
+            </div>
+            <div className="text-[12px] font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-lg px-2 py-1">
+              <span className="w-4 h-4 rounded-full grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-extrabold">2</span>Trim excess rights
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<number>; onOpen: (id: number, tab?: 'visual' | 'answer' | 'practice') => void }) {
+  const groups: { title: string; desc: string; color: string; ids: number[] }[] = [
+    { title: 'Fresher', desc: 'Core concepts every fresher must be able to explain.', color: 'text-emerald-600', ids: all.filter((x) => (questionMeta[x.id]?.level ?? 'Fresher') === 'Fresher').map((x) => x.id) },
+    { title: 'Intermediate', desc: 'Deeper dives — crypto, networking, detection and hardening.', color: 'text-blue-600', ids: all.filter((x) => (questionMeta[x.id]?.level ?? 'Fresher') === 'Intermediate').map((x) => x.id) },
+  ];
+  return (
+    <div className="flex-1 min-w-0 px-4 sm:px-8 py-6">
+      <div className="text-[12px] font-extrabold tracking-wide text-blue-600 uppercase">Top 50 for cloud security</div>
+      <h1 className="text-[26px] sm:text-[36px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight mt-1">Cloud Security Interview Questions</h1>
+      <p className="text-slate-500 dark:text-slate-400 mt-2 text-[14px] sm:text-[15px] max-w-[720px]">50 questions, ordered for learning. Each one has an animated visual lesson that shows what really happens, an interview-ready 60-second answer, and a quick check to test yourself.</p>
+      <div className="flex flex-col sm:flex-row gap-3 mt-4">
+        <button onClick={() => onOpen(all[0].id)} className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5 py-3 text-[14px] flex items-center justify-center gap-2">
+          <Icons.Play size={16} /> Start learning
+        </button>
+      </div>
+      <HowItWorksDemo />
+      <div className="grid sm:grid-cols-3 gap-4 mt-6">
+        {[
+          { Icon: Icons.Eye, name: 'Visual lesson', desc: 'Step-by-step animations with the key terms explained as they appear.', tab: 'visual' as const, cta: 'Watch it' },
+          { Icon: Icons.Mic, name: 'Interview answer', desc: 'A 60-second answer with takeaways, key points and likely follow-ups.', tab: 'answer' as const, cta: 'Say it' },
+          { Icon: Icons.Trophy, name: 'Quick check', desc: 'Ordering quiz and self-tests to confirm you really understood it.', tab: 'practice' as const, cta: 'Try it' },
+        ].map(({ Icon, name, desc, tab, cta }, i) => (
+          <button key={name} onClick={() => onOpen(all[0].id, tab)} title={`${cta} — opens Q1 in ${name} mode`}
+            className="pop group text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 transition-all hover:-translate-y-1 hover:shadow-[0_12px_28px_-12px_rgba(37,99,235,.45)] hover:border-blue-300 cursor-pointer" style={{ animationDelay: `${i * 0.15}s` }}>
+            <span className="inline-grid place-items-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 pulse-dot"><Icon size={20} className="text-blue-500" /></span>
+            <div className="font-bold text-[15px] mt-2.5 dark:text-white">{name}</div>
+            <p className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1">{desc}</p>
+            {i === 0 && (
+              <div className="flex items-center gap-1 mt-3">
+                {[0, 1, 2].map((d) => (
+                  <span key={d} className="h-1.5 rounded-full bg-blue-600 packet-pill" style={{ width: 22 - d * 5, animationDelay: `${d * 0.3}s` }} />
+                ))}
+                <Icons.MoveRight size={14} className="text-blue-400" />
+              </div>
+            )}
+            {i === 1 && (
+              <div className="flex items-end gap-1 mt-3 h-5" aria-hidden>
+                {[10, 18, 13, 20, 15].map((h, b) => (
+                  <span key={b} className="w-1.5 rounded-full bg-violet-500 pulse-dot" style={{ height: h, animationDelay: `${b * 0.25}s` }} />
+                ))}
+                <span className="text-[11px] font-bold text-violet-600 ml-1">60s</span>
+              </div>
+            )}
+            {i === 2 && (
+              <div className="flex items-center gap-1.5 mt-3">
+                {[0, 1, 2].map((c) => (
+                  <span key={c} className={`w-5 h-5 rounded-full grid place-items-center text-[10px] font-extrabold pop ${c === 0 ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`} style={{ animationDelay: `${c * 0.3}s` }}>
+                    {c === 0 ? <Icons.Check size={11} /> : c + 1}
+                  </span>
+                ))}
+                <span className="text-[11px] font-bold text-emerald-600 ml-1">2 of 3 placed</span>
+              </div>
+            )}
+            <span className="inline-flex items-center gap-1 mt-3 text-[13px] font-bold text-blue-600 group-hover:gap-2 transition-all">{cta} <Icons.MoveRight size={14} /></span>
+          </button>
+        ))}
+      </div>
+      <div className="grid md:grid-cols-2 gap-4 mt-6">
+        {groups.map((g) => {
+          const gDone = g.ids.filter((id) => done.has(id)).length;
+          const pct = g.ids.length ? Math.round((gDone / g.ids.length) * 100) : 0;
+          const nextId = g.ids.find((id) => !done.has(id));
+          const nextQ = nextId !== undefined ? all.find((x) => x.id === nextId)! : null;
+          return (
+            <div key={g.title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+              <div className="flex items-baseline gap-2">
+                <span className={`font-extrabold text-[17px] ${g.color}`}>{g.title}</span>
+                <span className="ml-auto text-[13px] font-semibold text-slate-400">{gDone} / {g.ids.length} · {pct}%</span>
+              </div>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">{g.desc}</p>
+              <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full mt-2 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all" style={{ width: pct + '%' }} /></div>
+              {nextQ && (
+                <button onClick={() => onOpen(nextQ.id)} className="mt-2.5 w-full text-left text-[12.5px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50/70 dark:bg-blue-950/40 hover:bg-blue-50 dark:hover:bg-blue-950/60 border border-blue-100 dark:border-blue-900 rounded-lg px-3 py-2 flex items-center gap-1.5 min-w-0">
+                  <Icons.Play size={13} className="shrink-0" /> <span className="min-w-0 leading-snug">Next: Q{all.findIndex((x) => x.id === nextQ.id) + 1} — {nextQ.question.length > 52 ? nextQ.question.slice(0, 52) + '…' : nextQ.question}</span>
+                </button>
+              )}
+              {!nextQ && (
+                <div className="mt-2.5 text-[12.5px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                  <Icons.CheckCircle2 size={14} /> {g.title} complete — nice work!
+                </div>
+              )}
+              <ol className="mt-3 divide-y divide-slate-100 dark:divide-slate-800 max-h-[320px] overflow-y-auto thin-scroll">
+                {g.ids.map((id) => {
+                  const q = all.find((x) => x.id === id)!;
+                  const idx = all.findIndex((x) => x.id === id);
+                  const must = questionMeta[id]?.priority === 'Must-know';
+                  const isDone = done.has(id);
+                  return (
+                    <li key={id}>
+                      <button onClick={() => onOpen(id)} className={`group w-full text-left flex items-center gap-3 py-2.5 rounded-lg px-2 transition-colors ${isDone ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-950/40' : 'hover:bg-blue-50/70 dark:hover:bg-slate-800'}`}>
+                        <span className={`text-[12px] font-bold w-7 h-7 rounded-lg grid place-items-center shrink-0 ${isDone ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{String(idx + 1).padStart(2, '0')}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className={`block text-[13.5px] leading-snug ${isDone ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>{q.question}</span>
+                          {must && <span className="inline-block mt-1 text-[10px] font-extrabold rounded-full px-2 py-0.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 whitespace-nowrap">Must-know</span>}
+                        </span>
+                        <Icons.MoveRight size={15} className="text-blue-500 shrink-0 hidden sm:block opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                        {isDone ? <Icons.CheckCircle2 size={18} className="text-emerald-500 shrink-0" /> : <Icons.Circle size={18} className="text-slate-200 dark:text-slate-600 shrink-0" />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- App ---------- */
 export default function App() {
   const { data } = useLocalQuestions();
@@ -393,6 +549,7 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('cs-quiz-best') || '{}'); } catch { return {}; }
   });
   const [sheet, setSheet] = useState(false);
+  const [view, setView] = useState<'home' | 'learn'>('home');
   const [theme, setTheme] = useState(() => localStorage.getItem('cs-theme') || 'light');
   const timer = useRef<any>(null);
   const qbarRef = useRef<HTMLDivElement>(null);
@@ -457,11 +614,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen dark:bg-slate-950">
-      <Header q={hq} onSearch={setHq} onMenu={() => setDrawer(!drawer)} theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+      <Header q={hq} onSearch={setHq} onMenu={() => setDrawer(!drawer)} onHome={() => setView('home')} view={view} theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
       <div className="flex max-w-[1440px] mx-auto items-start">
         <Sidebar list={list} active={active} highlight done={done} sq={sq} onSq={setSq} open={drawer} onSheet={() => setSheet(true)}
           onReset={() => { setDone(new Set()); localStorage.removeItem('cs-done'); }}
-          onClose={() => setDrawer(false)} onPick={(id: number) => { setActive(id); setDrawer(false); }} />
+          onClose={() => setDrawer(false)} onPick={(id: number) => { setActive(id); setDrawer(false); setView('learn'); }} />
+        {view === 'home' ? (
+          <HomeView all={all} done={done} onOpen={(id: number, tab?: 'visual' | 'answer' | 'practice') => { setActive(id); if (tab) setTab(tab); setView('learn'); }} />
+        ) : (
         <main className="flex-1 min-w-0 px-4 sm:px-8 py-6 flex flex-col self-stretch">
           <div ref={qbarRef} className="sticky top-[60px] z-10 bg-[#f7f9fc] dark:bg-slate-950 pt-1 pb-3 -mx-1 px-1">
           <h1 className="text-[26px] sm:text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">{cur.question}</h1>
@@ -681,6 +841,7 @@ export default function App() {
             </div>
             </div>
         </main>
+        )}
       </div>
       {sheet && <InterviewSheet all={all} onClose={() => setSheet(false)} />}
     </div>
