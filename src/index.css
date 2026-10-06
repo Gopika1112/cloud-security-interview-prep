@@ -42,6 +42,13 @@ input[type="range"].sim::-webkit-slider-thumb { -webkit-appearance: none; width:
 @media print {
   body * { visibility: hidden; }
   #interview-sheet, #interview-sheet * { visibility: visible; }
-  #interview-sheet { position: absolute; inset: 0; max-height: none; overflow: visible; }
+  #interview-sheet {
+    position: absolute; inset: 0; max-height: none; overflow: visible;
+    background: #fff !important; color: #0f1e3d !important;
+  }
+  #interview-sheet * { background: transparent !important; color: #0f1e3d !important; border-color: #cbd5e1 !important; }
+  #interview-sheet > div { break-inside: avoid; }
+  #interview-sheet h2 { font-size: 20pt; }
+  @page { margin: 14mm; }
   .no-print { display: none !important; }
 }

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import * as Icons from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import {
+  Activity, AlertOctagon, AlertTriangle, Archive, ArrowLeftRight, ArrowUpRight, Bot, Box, Briefcase, Building,
+  Camera, Check, CheckCircle, CheckCircle2, ChevronDown, Circle, Clock, Cloud, CloudRainWind, Container, Copy,
+  Crosshair, Crown, Database, Eye, FileText, Filter, Fingerprint, Gauge, GitBranch, Globe, Handshake, KeyRound,
+  KeySquare, LayoutGrid, Lightbulb, ListChecks, ListOrdered, Lock, LockKeyhole, LockOpen, LogIn, Menu, MessageCircle,
+  MessageCircleQuestion, Mic, Moon, MoveRight, NotebookPen, OctagonX, Package, Pause, Play, Plug, Printer, Radar,
+  RefreshCw, Repeat, RotateCcw, Scale, ScanEye, ScrollText, Search, Server, Shield, ShieldCheck, ShieldHalf, Siren,
+  SkipBack, SkipForward, SlidersHorizontal, Smartphone, Square, Sun, Tag, Target, Timer, TrendingUp, Trophy, Upload,
+  User, Users, Volume2, Wrench, X,
+} from 'lucide-react';
 import { cloudSecurityQuestions, type CloudQuestion } from './data/cloudSecurityQuestions';
 import { interviewAnswers } from './data/interviewAnswers';
 import { questionMeta } from './data/questionMeta';
@@ -9,13 +17,54 @@ import { followUps } from './data/followUps';
 const TOTAL = 50;
 
 function useLocalQuestions() {
-  return useQuery({ queryKey: ['cloud-security-questions'], queryFn: async () => cloudSecurityQuestions.slice(0, TOTAL), staleTime: Infinity });
+  const [attempt, setAttempt] = useState(0);
+  const state = useMemo(() => {
+    try {
+      const rows = cloudSecurityQuestions.slice(0, TOTAL);
+      if (rows.length === 0) throw new Error('empty bank');
+      return { data: rows as CloudQuestion[], isError: false, isPending: false };
+    } catch {
+      return { data: [] as CloudQuestion[], isError: true, isPending: false };
+    }
+  }, [attempt]);
+  return { ...state, refetch: () => setAttempt((a) => a + 1) };
 }
+const Icons = {
+  Activity, AlertOctagon, AlertTriangle, Archive, ArrowLeftRight, ArrowUpRight, Bot, Box, Briefcase, Building,
+  Camera, Check, CheckCircle, CheckCircle2, ChevronDown, Circle, Clock, Cloud, CloudRainWind, Container, Copy,
+  Crosshair, Crown, Database, Eye, FileText, Filter, Fingerprint, Gauge, GitBranch, Globe, Handshake, KeyRound,
+  KeySquare, LayoutGrid, Lightbulb, ListChecks, ListOrdered, Lock, LockKeyhole, LockOpen, LogIn, Menu, MessageCircle,
+  MessageCircleQuestion, Mic, Moon, MoveRight, NotebookPen, OctagonX, Package, Pause, Play, Plug, Printer, Radar,
+  RefreshCw, Repeat, RotateCcw, Scale, ScanEye, ScrollText, Search, Server, Shield, ShieldCheck, ShieldHalf, Siren,
+  SkipBack, SkipForward, SlidersHorizontal, Smartphone, Square, Sun, Tag, Target, Timer, TrendingUp, Trophy, Upload,
+  User, Users, Volume2, Wrench, X,
+};
 function DynIcon({ name, size = 22 }: { name: string; size?: number }) {
-  const C = (Icons as any)[name] ?? Icons.Box;
+  const C = (Icons as any)[name] ?? Box;
   return <C size={size} />;
 }
 const shortLabel = (t: string) => t.replace(/^Step \d+:\s*/, '');
+
+/* Clipboard with manual-copy fallback (no deprecated execCommand). */
+async function copyText(t: string): Promise<'ok' | 'manual' | 'fail'> {
+  try { await navigator.clipboard.writeText(t); return 'ok'; }
+  catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.readOnly = true;
+      ta.setAttribute('aria-label', 'Copy text — press Ctrl+C then Escape');
+      ta.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(92vw,560px);height:140px;z-index:9999;padding:10px;border:2px solid #2563eb;border-radius:10px;font-size:13px;';
+      ta.title = 'Clipboard blocked — press Ctrl+C (Cmd+C on Mac), then Escape';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      await new Promise<void>((res) => {
+        const h = (e: KeyboardEvent) => { if (e.key === 'Escape' || e.key === 'Enter') { window.removeEventListener('keydown', h); ta.remove(); res(); } };
+        window.addEventListener('keydown', h);
+        setTimeout(() => { window.removeEventListener('keydown', h); if (ta.isConnected) ta.remove(); res(); }, 20000);
+      });
+      return 'manual';
+    } catch { return 'fail'; }
+  }
+}
 
 function useNarrow(bp = 640) {
   const [n, setN] = useState(() => typeof window !== 'undefined' && window.innerWidth < bp);
@@ -59,7 +108,7 @@ function Header({ q, onSearch, onMenu, onHome, view, theme, onTheme }: { q: stri
 }
 
 /* ---------- Sidebar ---------- */
-function Sidebar({ list, active, highlight, done, onPick, sq, onSq, open, onClose, onSheet, onReset }: any) {
+function Sidebar({ list, all, active, done, onPick, sq, onSq, open, onClose, onSheet, onReset }: any) {
   const pct = Math.round((done.size / TOTAL) * 100);
   return (
     <>
@@ -77,12 +126,13 @@ function Sidebar({ list, active, highlight, done, onPick, sq, onSq, open, onClos
               className="w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg pl-9 pr-2 py-2 text-[13px] outline-none focus:border-blue-400" />
           </div>
           <div id="q-list" className="mt-2 max-h-[calc(100vh-300px)] min-h-[300px] overflow-y-auto thin-scroll divide-y divide-slate-100 dark:divide-slate-700">
-            {list.map((x: CloudQuestion, i: number) => {
-              const isA = highlight && active === x.id;
+            {list.map((x: CloudQuestion) => {
+              const isA = active != null && active === x.id;
+              const gnum = String((all?.findIndex((q: CloudQuestion) => q.id === x.id) ?? -1) + 1).padStart(2, '0');
               return (
                 <button key={x.id} onClick={() => onPick(x.id)} data-active={isA ? 'true' : undefined}
                   className={`w-full text-left flex items-center gap-3 pl-2 pr-1 py-[11px] rounded-lg border-l-4 ${isA ? 'bg-blue-50/80 dark:bg-blue-950/60 border-blue-500' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                  <span className={`text-[13px] w-6 font-medium ${isA ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>{String(i + 1).padStart(2, '0')}</span>
+                  <span className={`text-[13px] w-6 font-medium ${isA ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>{gnum}</span>
                   <span className={`text-[13.5px] flex-1 leading-snug ${isA ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-600 dark:text-slate-300'}`}>{x.question}</span>
                   {done.has(x.id) ? <Icons.CheckCircle2 size={19} className="text-emerald-500 shrink-0" /> :
                     isA ? <span className="w-[19px] h-[19px] rounded-full border-[2.5px] border-blue-500 grid place-items-center shrink-0"><span className="w-2 h-2 rounded-full bg-blue-500" /></span>
@@ -124,7 +174,7 @@ function Stepper({ q, step }: { q: CloudQuestion; step: number }) {
 function SimCanvas({ q, step, playing }: { q: CloudQuestion; step: number; playing: boolean }) {
   const s = q.steps[step];
   const n = s.nodes.length;
-  const narrow = useNarrow();
+  const narrow = useNarrow(768);
   const pktM = shortLabel(s.title).slice(0, 18) || 'REQUEST';
   const retM = step > 0 ? shortLabel(q.steps[step - 1].title).slice(0, 18) + ' ✓' : '';
   if (narrow) {
@@ -148,7 +198,7 @@ function SimCanvas({ q, step, playing }: { q: CloudQuestion; step: number; playi
                   <span className="min-w-0">
                     <span className="block text-[13.5px] font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{nd.label}</span>
                     <span className="block text-[11.5px] text-slate-400">{nd.sub || `hop ${i + 1}`}</span>
-                    {now && <span className="inline-block mt-1 text-[10.5px] font-extrabold rounded px-1.5 py-0.5 bg-blue-600 text-white">▶ {pktM}</span>}
+                    {now && <span className="inline-block mt-1 text-[12px] font-extrabold rounded px-1.5 py-0.5 bg-blue-600 text-white">▶ {pktM}</span>}
                   </span>
                   {i < s.focus && <Icons.CheckCircle2 size={18} className="text-emerald-500 shrink-0 ml-auto" />}
                 </div>
@@ -236,8 +286,8 @@ function InterviewSheet({ all, onClose }: { all: CloudQuestion[]; onClose: () =>
     `Q${i + 1}. ${q.question}\nTakeaway: ${q.takeaway}\nKey points:\n- ${q.keyPoints.join('\n- ')}`
   ).join('\n\n');
   const copyAll = async () => {
-    try { await navigator.clipboard.writeText(text); }
-    catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    const r = await copyText(text);
+    if (r === 'fail') return;
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
   useEffect(() => {
@@ -321,7 +371,15 @@ function OrderQuiz({ q, onBest }: { q: CloudQuestion; onBest?: (qid: number, val
     const prev = best[q.id] ?? 0;
     if (c > prev) { const nb = { ...best, [q.id]: c }; setBest(nb); localStorage.setItem('cs-quiz-best', JSON.stringify(nb)); onBest?.(q.id, c); }
   };
-  const retryWrong = () => { setCheckedOnce(false); setSel(null); };
+  const retryWrong = () => {
+    setOrder((prev) => {
+      const openVals = prev.filter((_, i) => !locked[i]);
+      for (let i = openVals.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [openVals[i], openVals[j]] = [openVals[j], openVals[i]]; }
+      let k = 0;
+      return prev.map((v, i) => (locked[i] ? v : openVals[k++]));
+    });
+    setCheckedOnce(false); setSel(null);
+  };
   const reveal = () => {
     setOrder(Array.from({ length: n }, (_, i) => i));
     setLocked(Array(n).fill(true)); setRevealed(true);
@@ -366,15 +424,21 @@ function OrderQuiz({ q, onBest }: { q: CloudQuestion; onBest?: (qid: number, val
 }
 
 /* ---------- Home (welcome view, in-app — not a separate page) ---------- */
-function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<number>; onOpen: (id: number, tab?: 'visual' | 'answer' | 'practice') => void }) {
+function HomeView({ all, done, query, onQuery, onOpen }: { all: CloudQuestion[]; done: Set<number>; query: string; onQuery: (v: string) => void; onOpen: (id: number, tab?: 'visual' | 'answer' | 'practice') => void }) {
   const groups: { title: string; desc: string; color: string; ids: number[] }[] = [
     { title: 'Fresher', desc: 'Core concepts every fresher must be able to explain.', color: 'text-emerald-600', ids: all.filter((x) => (questionMeta[x.id]?.level ?? 'Fresher') === 'Fresher').map((x) => x.id) },
     { title: 'Intermediate', desc: 'Deeper dives — crypto, networking, detection and hardening.', color: 'text-blue-600', ids: all.filter((x) => (questionMeta[x.id]?.level ?? 'Fresher') === 'Intermediate').map((x) => x.id) },
   ];
   return (
     <div className="flex-1 min-w-0 px-4 sm:px-8 py-6">
+      <div className="relative sm:hidden mb-4">
+        <Icons.Search size={15} className="absolute left-3 top-[10px] text-slate-400" />
+        <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search questions..."
+          aria-label="Search questions"
+          className="w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg pl-9 pr-2 py-2 text-[13px] outline-none focus:border-blue-400" />
+      </div>
       <div className="text-left text-[14px] sm:text-[15px] font-extrabold tracking-widest text-blue-600 uppercase">Top 50 for cloud security</div>
-      <h1 className="text-left text-[44px] sm:text-[64px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.05] mt-2">Cloud Security Interview Questions</h1>
+      <h1 className="text-left text-[30px] sm:text-[64px] font-bold sm:font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.15] sm:leading-[1.05] mt-2">Cloud Security Interview Questions</h1>
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-3">
         <p className="text-left text-slate-500 dark:text-slate-400 text-[15px] sm:text-[17px] max-w-[760px] flex-1">50 questions, ordered for learning. Each one has an animated visual lesson that shows what really happens, an interview-ready 60-second answer, and a quick check to test yourself.</p>
         <button onClick={() => onOpen(all[0].id)} className="w-full sm:w-auto shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5 py-3 text-[14px] flex items-center justify-center gap-2">
@@ -419,7 +483,7 @@ function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<numbe
             {i === 2 && (
               <div className="flex items-center gap-1.5 mt-3">
                 {[0, 1, 2].map((c) => (
-                  <span key={c} className={`w-5 h-5 rounded-full grid place-items-center text-[10px] font-extrabold pop ${c === 0 ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`} style={{ animationDelay: `${c * 0.3}s` }}>
+                  <span key={c} className={`w-5 h-5 rounded-full grid place-items-center text-[11px] font-extrabold pop ${c === 0 ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`} style={{ animationDelay: `${c * 0.3}s` }}>
                     {c === 0 ? <Icons.Check size={11} /> : c + 1}
                   </span>
                 ))}
@@ -466,7 +530,7 @@ function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<numbe
                         <span className={`text-[12px] font-bold w-7 h-7 rounded-lg grid place-items-center shrink-0 ${isDone ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{String(idx + 1).padStart(2, '0')}</span>
                         <span className="flex-1 min-w-0">
                           <span className={`block text-[13.5px] leading-snug ${isDone ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>{q.question}</span>
-                          {must && <span className="inline-block mt-1 text-[10px] font-extrabold rounded-full px-2 py-0.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 whitespace-nowrap">Must-know</span>}
+                          {must && <span className="inline-block mt-1 text-[11px] font-extrabold rounded-full px-2 py-0.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 whitespace-nowrap">Must-know</span>}
                         </span>
                         <Icons.MoveRight size={15} className="text-blue-500 shrink-0 hidden sm:block opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                         {isDone ? <Icons.CheckCircle2 size={18} className="text-emerald-500 shrink-0" /> : <Icons.Circle size={18} className="text-slate-200 dark:text-slate-600 shrink-0" />}
@@ -485,14 +549,20 @@ function HomeView({ all, done, onOpen }: { all: CloudQuestion[]; done: Set<numbe
 
 /* ---------- App ---------- */
 export default function App() {
-  const { data } = useLocalQuestions();
-  const [active, setActive] = useState(1);
-  const [hq, setHq] = useState(''); const [sq, setSq] = useState('');
+  const { data, isError, refetch, isPending } = useLocalQuestions();
+  const [active, setActive] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
   const [tab, setTab] = useState<'visual' | 'answer' | 'practice'>('visual');
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
-  const [done, setDone] = useState<Set<number>>(() => new Set(JSON.parse(localStorage.getItem('cs-done') || '[]')));
+  const [done, setDone] = useState<Set<number>>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('cs-done') || '[]');
+      if (!Array.isArray(raw)) return new Set<number>();
+      return new Set(raw.filter((n: any) => Number.isInteger(n) && n >= 1 && n <= TOTAL));
+    } catch { return new Set<number>(); }
+  });
   const [drawer, setDrawer] = useState(false);
   const [predict, setPredict] = useState(false);
   const [checks, setChecks] = useState<Set<string>>(new Set());
@@ -519,9 +589,9 @@ export default function App() {
   const [railTop, setRailTop] = useState(200);
 
   const all = data ?? [];
-  const term = (hq || sq).toLowerCase();
+  const term = query.toLowerCase();
   const list = useMemo(() => all.filter((x) => !term || (x.question + ' ' + x.shortDescription + ' ' + x.keywords.join(' ')).toLowerCase().includes(term)), [all, term]);
-  const cur = all.find((x) => x.id === active) ?? all[0];
+  const cur = (active != null ? all.find((x) => x.id === active) : undefined) ?? all[0];
 
   useEffect(() => { setStep(0); setPlaying(true); setPredict(false); setTab('visual'); setChecks(new Set()); setCopied(false); setFollow(false); }, [active]);
   useEffect(() => {
@@ -530,12 +600,13 @@ export default function App() {
   }, [active]);
   useEffect(() => {
     try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
-    if (tickRef.current) clearInterval(tickRef.current);
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     setSpeaking(false); setTLeft(null);
   }, [active]);
-  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* noop */ } if (tickRef.current) clearInterval(tickRef.current); }, []);
+  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* noop */ } if (tickRef.current) clearInterval(tickRef.current); if (timer.current) clearTimeout(timer.current); }, []);
   useEffect(() => {
-    if (!cur || !playing || tab !== 'visual') return;
+    if (view !== 'learn' || !cur || !playing || tab !== 'visual') return;
     if (step >= cur.steps.length - 1) { setPlaying(false); return; }
     timer.current = setTimeout(() => setStep((s) => Math.min(s + 1, cur.steps.length - 1)), 2200 / speed);
     return () => clearTimeout(timer.current);
@@ -544,13 +615,16 @@ export default function App() {
   useEffect(() => {
     const measure = () => {
       const h = qbarRef.current?.offsetHeight ?? 140;
-      setRailTop(60 + h + 16);
+      setRailTop(60 + Math.max(h, 80) + 16);
     };
     measure();
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [active]);
+    try { (document as any).fonts?.ready?.then(measure); } catch { /* noop */ }
+    const t = setTimeout(measure, 500);
+    return () => { window.removeEventListener('resize', measure); clearTimeout(t); };
+  }, [active, cur?.id]);
   useEffect(() => {
+    if (view !== 'learn' || active == null) return;
     setSeen((prev) => {
       const k = `${active}-${tab}`;
       if (prev[k]) return prev;
@@ -558,32 +632,45 @@ export default function App() {
       localStorage.setItem('cs-seen', JSON.stringify(n));
       return n;
     });
-  }, [tab, active]);
+  }, [tab, active, view]);
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('cs-theme', theme);
   }, [theme]);
 
-  if (!cur) return <div className="p-10 text-slate-500">Loading questions…</div>;
-  const markDone = () => setDone((d) => new Set(d).add(cur.id));
+  const markDone = () => { if (view === 'learn' && active != null && cur) setDone((d) => new Set(d).add(cur.id)); };
   const updateNote = (v: string) => {
-    setNotes((prev) => {
-      const n = { ...prev, [cur.id]: v };
-      localStorage.setItem('cs-notes', JSON.stringify(n));
-      return n;
-    });
+    if (!cur) return;
+    const id = cur.id;
+    setNotes((prev) => ({ ...prev, [id]: v }));
   };
-  const fill = (step / Math.max(1, cur.steps.length - 1)) * 100;
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try { localStorage.setItem('cs-notes', JSON.stringify(notes)); } catch { /* quota */ }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [notes]);
+  const fill = cur ? (step / Math.max(1, cur.steps.length - 1)) * 100 : 0;
+  if (isError || (all.length === 0 && !isPending)) return (
+    <div className="min-h-screen grid place-items-center p-10">
+      <div className="text-center max-w-sm">
+        <div className="font-extrabold text-[18px] dark:text-white">Questions failed to load</div>
+        <p className="text-[14px] text-slate-500 dark:text-slate-400 mt-1">Something went wrong loading the question bank. Your progress is safe.</p>
+        <button onClick={() => refetch()} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-[14px] font-bold rounded-lg px-5 py-2.5">Try again</button>
+      </div>
+    </div>
+  );
+  if (!cur) return <div className="p-10 text-slate-500">Loading questions…</div>;
 
   return (
     <div className="min-h-screen dark:bg-slate-950">
-      <Header q={hq} onSearch={setHq} onMenu={() => setDrawer(!drawer)} onHome={() => setView('home')} view={view} theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+      <Header q={query} onSearch={setQuery} onMenu={() => setDrawer(!drawer)} onHome={() => setView('home')} view={view} theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
       <div className="flex max-w-[1440px] mx-auto items-start">
-        <Sidebar list={list} active={active} highlight done={done} sq={sq} onSq={setSq} open={drawer} onSheet={() => setSheet(true)}
+        <Sidebar list={list} all={all} active={active} done={done} sq={query} onSq={setQuery} open={drawer} onSheet={() => setSheet(true)}
           onReset={() => { setDone(new Set()); localStorage.removeItem('cs-done'); }}
           onClose={() => setDrawer(false)} onPick={(id: number) => { setActive(id); setDrawer(false); setView('learn'); }} />
         {view === 'home' ? (
-          <HomeView all={all} done={done} onOpen={(id: number, tab?: 'visual' | 'answer' | 'practice') => { setActive(id); if (tab) setTab(tab); setView('learn'); }} />
+          <HomeView all={all} done={done} query={query} onQuery={setQuery} onOpen={(id: number, tab?: 'visual' | 'answer' | 'practice') => { setActive(id); if (tab) setTab(tab); setView('learn'); }} />
         ) : (
         <main className="flex-1 min-w-0 px-4 sm:px-8 py-6 flex flex-col self-stretch">
           <div ref={qbarRef} className="sticky top-[60px] z-10 bg-[#f7f9fc] dark:bg-slate-950 pt-1 pb-3 -mx-1 px-1">
@@ -605,7 +692,7 @@ export default function App() {
                     className={`flex-1 sm:flex-none sm:w-[118px] px-2 py-2 sm:py-3 rounded-xl flex sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 text-left transition-all ${isA ? 'bg-blue-600 text-white shadow' : done_ ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                     <Icon size={20} className="shrink-0" />
                     <span className="flex sm:flex-col flex-row items-baseline sm:items-start gap-1 sm:gap-0 leading-tight min-w-0">
-                      <span className={`text-[9px] sm:text-[9.5px] font-extrabold tracking-wide ${isA ? 'text-blue-200' : done_ ? 'text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>{step}</span>
+                      <span className={`text-[11px] sm:text-[11.5px] font-extrabold tracking-wide ${isA ? 'text-blue-200' : done_ ? 'text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>{step}</span>
                       <span className="text-[11.5px] sm:text-[12.5px] font-bold flex items-center gap-1">{name}{done_ && <Icons.Check size={13} className="text-emerald-500" />}</span>
                     </span>
                   </button>
@@ -624,11 +711,11 @@ export default function App() {
                   </button>
                   <button onClick={() => { setStep((s) => Math.max(0, s - 1)); setPlaying(false); }} className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-600 grid place-items-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="prev"><Icons.SkipBack size={16} /></button>
                   <button onClick={() => { setStep((s) => Math.min(cur.steps.length - 1, s + 1)); setPlaying(false); if (step >= cur.steps.length - 2) markDone(); }} className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-600 grid place-items-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="next"><Icons.SkipForward size={16} /></button>
-                  <input type="range" min={0} max={cur.steps.length - 1} value={step} onChange={(e) => { setStep(Number(e.target.value)); setPlaying(false); }}
+                  <input type="range" min={0} max={cur.steps.length - 1} value={step} aria-label="Animation step scrubber" onChange={(e) => { setStep(Number(e.target.value)); setPlaying(false); }}
                     className="sim w-full sm:w-auto sm:flex-1 sm:min-w-[140px] order-first sm:order-none" style={{ ['--fill' as any]: fill + '%' }} />
                   <span className="text-[13px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">Step {step + 1} of {cur.steps.length}</span>
                   <div className="relative">
-                    <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="appearance-none border border-slate-200 dark:border-slate-600 rounded-lg text-[13px] font-semibold pl-3 pr-8 py-2 bg-white dark:bg-slate-800 dark:text-slate-100">
+                    <select value={speed} aria-label="Animation playback speed" onChange={(e) => setSpeed(Number(e.target.value))} className="appearance-none border border-slate-200 dark:border-slate-600 rounded-lg text-[13px] font-semibold pl-3 pr-8 py-2 bg-white dark:bg-slate-800 dark:text-slate-100">
                       <option value={0.5}>0.5x</option><option value={1}>1x</option><option value={1.5}>1.5x</option><option value={2}>2x</option>
                     </select>
                     <Icons.ChevronDown size={15} className="absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
@@ -656,7 +743,7 @@ export default function App() {
                     <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5 text-[13px] text-emerald-800 font-semibold">Flow complete — summarize it in order: {cur.keyPoints[2]}</div>
                   )}
                   <div className="flex gap-2 mt-4 flex-wrap">
-                    <button onClick={() => setActive(active % TOTAL + 1)} className="bg-blue-600 hover:bg-blue-700 text-white text-[13.5px] font-semibold rounded-lg px-4 py-2">Next question →</button>
+                    <button onClick={() => setActive(((cur.id % TOTAL) + 1))} className="bg-blue-600 hover:bg-blue-700 text-white text-[13.5px] font-semibold rounded-lg px-4 py-2">Next question →</button>
                     <button onClick={markDone} className="border border-slate-200 dark:border-slate-600 text-[13.5px] font-semibold rounded-lg px-4 py-2 text-slate-600 dark:text-slate-300">{done.has(cur.id) ? '✓ Completed' : 'Mark complete'}</button>
                   </div>
                 </div>
@@ -669,8 +756,8 @@ export default function App() {
             const words = script.split(/\s+/).filter(Boolean).length;
             const secs = Math.round((words / 140) * 60);
             const copy = async () => {
-              try { await navigator.clipboard.writeText(script); }
-              catch { const ta = document.createElement('textarea'); ta.value = script; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+              const r = await copyText(script);
+              if (r === 'fail') return;
               setCopied(true); setTimeout(() => setCopied(false), 2000);
             };
             const toggleCheck = (i: number) => setChecks((prev) => {
@@ -797,7 +884,7 @@ export default function App() {
                 <span className="text-[12px] font-semibold rounded-full px-2.5 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Quiz best {(quizBest[cur.id] ?? 0)}/{cur.steps.length}</span>
                 <span className={`text-[12px] font-semibold rounded-full px-2.5 py-1 ${predict ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>Takeaway {predict ? 'reviewed ✓' : 'not yet'}</span>
                 <span className="text-[12px] font-semibold rounded-full px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">{(notes[cur.id] || '').trim() ? `${(notes[cur.id] || '').trim().split(/\s+/).length} note words` : 'No notes yet'}</span>
-                <button onClick={() => setActive(active % TOTAL + 1)} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold rounded-lg px-4 py-2">Next question →</button>
+                <button onClick={() => setActive((cur.id % TOTAL) + 1)} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold rounded-lg px-4 py-2">Next question →</button>
               </div>
             </div>
           )}
